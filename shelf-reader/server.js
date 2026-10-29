@@ -105,6 +105,41 @@ async function loadMeta(book) {
   return { title: fallbackTitle, pages, cover: pages[0] || null };
 }
 
+// A content fingerprint lets reading progress follow a book that was renamed or moved.
+async function fingerprint(abs, size) {
+  const fh = await fsp.open(abs, 'r');
+  try {
+    const buf = Buffer.alloc(Math.min(size, 65536));
+    await fh.read(buf, 0, buf.length, 0);
+    return crypto.createHash('sha1').update(String(size)).update(buf).digest('hex').slice(0, 16);
+  } finally {
+    await fh.close();
+  }
+}
+
+function reclaimProgress() {
+  const orphans = Object.keys(state.progress).filter((id) => !books.has(id) && state.progress[id].fp);
+  let changed = false;
+  for (const book of books.values()) {
+    const own = state.progress[book.id];
+    if (own) {
+      if (own.fp !== book.fp) { own.fp = book.fp; changed = true; }
+      continue;
+    }
+    const i = orphans.findIndex((id) => state.progress[id].fp === book.fp);
+    if (i < 0) continue;
+    const [old] = orphans.splice(i, 1);
+    state.progress[book.id] = state.progress[old];
+    delete state.progress[old];
+    if (state.typing.books[old]) {
+      state.typing.books[book.id] = state.typing.books[old];
+      delete state.typing.books[old];
+    }
+    changed = true;
+  }
+  if (changed) saveState();
+}
+
 let scanning = null;
 let lastScan = 0;
 function scan(force = false) {
@@ -124,6 +159,7 @@ function scan(force = false) {
         if (old && old.mtimeMs === st.mtimeMs && old.size === st.size) continue;
         const book = { id, rel, abs, kind: kindOf(abs), size: st.size, mtimeMs: st.mtimeMs, added: st.birthtimeMs || st.mtimeMs };
         try {
+          book.fp = await fingerprint(abs, st.size);
           book.meta = await loadMeta(book);
         } catch (err) {
           book.error = err.message;
@@ -132,6 +168,7 @@ function scan(force = false) {
         books.set(id, book);
       }
       for (const id of books.keys()) if (!seen.has(id)) books.delete(id);
+      reclaimProgress();
       lastScan = Date.now();
     })().finally(() => { scanning = null; });
   }
@@ -288,7 +325,7 @@ async function route(req, res) {
   if (!p.startsWith('/api/')) return serveStatic(res, p);
 
   if (p === '/api/books' && req.method === 'GET') {
-    await scan();
+    await scan(url.searchParams.has('refresh'));
     const list = [...books.values()].map(summary);
     return json(res, 200, list);
   }
@@ -326,7 +363,7 @@ async function route(req, res) {
   if (action === 'progress') {
     if (req.method === 'PUT') {
       const body = await readJson(req);
-      state.progress[id] = { ...(state.progress[id] || {}), ...body, updated: Date.now() };
+      state.progress[id] = { ...(state.progress[id] || {}), ...body, fp: book.fp, updated: Date.now() };
       saveState();
     }
     return json(res, 200, state.progress[id] || {});

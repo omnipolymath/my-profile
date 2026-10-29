@@ -60,7 +60,41 @@ async function api(method, url, body) {
 }
 
 const resUrl = (id, href) => `/api/books/${id}/res/${href.split('/').map(encodeURIComponent).join('/')}`;
-const saveProgress = (id, data) => api('PUT', `/api/books/${id}/progress`, data).catch(() => {});
+// Identifies this browser so we can tell when you've read further on another device.
+const DEVICE = store.get('device', null) || (() => {
+  const id = Math.random().toString(36).slice(2, 10);
+  store.set('device', id);
+  return id;
+})();
+const saveProgress = (id, data) => api('PUT', `/api/books/${id}/progress`, { ...data, device: DEVICE }).catch(() => {});
+
+let syncTimer;
+function offerJump(text, onJump) {
+  const bar = $('syncBar');
+  bar.querySelector('span').textContent = text;
+  bar.querySelector('.jump').onclick = () => { bar.hidden = true; onJump(); };
+  bar.querySelector('.dismiss').onclick = () => { bar.hidden = true; };
+  bar.hidden = false;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { bar.hidden = true; }, 15000);
+}
+
+// Save immediately when the tab is hidden (phone locked, app switched), and when coming
+// back, check whether another device has moved further in this book.
+function keepPlace(id, signal, progress, save, onNewer) {
+  let seen = (progress && progress.updated) || 0;
+  const check = async () => {
+    try {
+      const p = await api('GET', `/api/books/${id}/progress`);
+      if (signal.aborted || !(p.updated > seen) || !p.device || p.device === DEVICE) return;
+      seen = p.updated;
+      onNewer(p);
+    } catch { /* offline */ }
+  };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save.flush(); else check(); }, { signal });
+  window.addEventListener('pagehide', () => save.flush(), { signal });
+  signal.addEventListener('abort', () => { $('syncBar').hidden = true; });
+}
 
 let toastTimer;
 function toast(msg) {
@@ -155,6 +189,33 @@ function renderGrid() {
   const grid = $('grid');
   grid.replaceChildren(...list.map(card));
   $('empty').hidden = libraryBooks.length > 0;
+  renderContinue();
+  const bytes = libraryBooks.reduce((n, b) => n + b.size, 0);
+  const size = bytes > 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+  $('libInfo').textContent = libraryBooks.length
+    ? `${libraryBooks.length} book${libraryBooks.length === 1 ? '' : 's'} · ${size} stored in your library folder on the server`
+    : '';
+}
+
+function renderContinue() {
+  const box = $('continue');
+  const last = libraryBooks
+    .filter((b) => b.progress && b.progress.updated && percent(b) < 1)
+    .sort((a, b) => b.progress.updated - a.progress.updated)[0];
+  box.hidden = !last;
+  if (!last) return;
+  const where = last.kind === 'epub'
+    ? `chapter ${(last.progress.chapter || 0) + 1} of ${last.length}`
+    : `page ${(last.progress.page || 0) + 1} of ${last.length}`;
+  box.querySelector('.c-title').textContent = last.title;
+  box.querySelector('.c-where').textContent = `${where} · ${Math.round(percent(last) * 100)}%`;
+  const img = box.querySelector('img');
+  img.hidden = !last.hasCover;
+  if (last.hasCover) img.src = `/api/books/${last.id}/cover`;
+  box.querySelector('.c-read').onclick = () => { location.hash = `#/read/${last.id}`; };
+  const type = box.querySelector('.c-type');
+  type.hidden = last.kind !== 'epub';
+  type.onclick = () => { location.hash = `#/type/${last.id}`; };
 }
 
 function card(b) {
@@ -325,6 +386,8 @@ function readerCss() {
     p { line-height: inherit !important; }`;
 }
 
+const ANCHORS = 'p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,img,figure,table,dt,dd';
+
 function epubReader(book, params, signal) {
   const frame = $('chapter');
   const select = $('tocSelect');
@@ -337,6 +400,8 @@ function epubReader(book, params, signal) {
   let ch = clamp(params.has('ch') ? Number(params.get('ch')) || 0 : progress.chapter || 0, 0, spine.length - 1);
   let pendingScroll = params.has('ch') ? Number(params.get('pos')) || 0 : progress.scroll || 0;
   let pendingHash = '';
+  let pendingAnchor = !params.has('ch') && progress.anchor != null && progress.chapter === ch
+    ? { anchor: progress.anchor, anchorOffset: progress.anchorOffset || 0 } : null;
 
   const scroller = () => frame.contentDocument && (frame.contentDocument.scrollingElement || frame.contentDocument.documentElement);
   const fraction = () => {
@@ -350,12 +415,36 @@ function epubReader(book, params, signal) {
     $('chInfo').textContent = `Chapter ${ch + 1} of ${spine.length} · ${pct}%`;
     $('rSub').textContent = labels[ch].replace(/^\d+\.\s*/, '');
   };
-  const save = debounce(() => saveProgress(book.id, { chapter: ch, scroll: fraction() }), 600);
+  // The exact paragraph at the top of the screen, so your place survives a different
+  // screen size or font size (a plain percentage drifts between phone and PC).
+  const anchor = () => {
+    const doc = frame.contentDocument;
+    if (!doc || !doc.body) return null;
+    const els = doc.body.querySelectorAll(ANCHORS);
+    for (let i = 0; i < els.length; i++) {
+      const r = els[i].getBoundingClientRect();
+      if (r.bottom > 1) return { anchor: i, anchorOffset: r.height ? clamp(-r.top / r.height, 0, 1) : 0 };
+    }
+    return null;
+  };
+  const scrollToAnchor = (a) => {
+    const doc = frame.contentDocument;
+    const el = a && doc && doc.body && doc.body.querySelectorAll(ANCHORS)[a.anchor];
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    scroller().scrollTop += r.top + a.anchorOffset * r.height;
+    return true;
+  };
+  const save = debounce(() => {
+    if (!frame.contentDocument || frame.src === 'about:blank') return;
+    saveProgress(book.id, { chapter: ch, scroll: fraction(), ...(anchor() || { anchor: null, anchorOffset: 0 }) });
+  }, 600);
 
-  function load(i, scroll = 0, hash = '') {
+  function load(i, scroll = 0, hash = '', at = null) {
     ch = clamp(i, 0, spine.length - 1);
     pendingScroll = scroll;
     pendingHash = hash;
+    pendingAnchor = at;
     select.value = ch;
     $('prevCh').disabled = ch === 0;
     $('nextCh').disabled = ch === spine.length - 1;
@@ -376,9 +465,13 @@ function epubReader(book, params, signal) {
     const doc = frame.contentDocument;
     if (!doc) return;
     const f = fraction();
+    const a = anchor();
     style(doc);
-    const s = scroller();
-    s.scrollTop = f * (s.scrollHeight - s.clientHeight);
+    if (!scrollToAnchor(a)) {
+      const s = scroller();
+      s.scrollTop = f * (s.scrollHeight - s.clientHeight);
+    }
+    save();
   }
 
   const prefix = `/api/books/${book.id}/res/`;
@@ -389,9 +482,10 @@ function epubReader(book, params, signal) {
     const s = scroller();
     const target = pendingHash && doc.getElementById(pendingHash);
     if (target) target.scrollIntoView();
-    else s.scrollTop = pendingScroll * (s.scrollHeight - s.clientHeight);
+    else if (!scrollToAnchor(pendingAnchor)) s.scrollTop = pendingScroll * (s.scrollHeight - s.clientHeight);
     pendingScroll = 0;
     pendingHash = '';
+    pendingAnchor = null;
     updateInfo();
     save();
 
@@ -430,7 +524,14 @@ function epubReader(book, params, signal) {
     location.hash = `#/type/${book.id}?ch=${ch}&pos=${fraction().toFixed(4)}`;
   }, { signal });
 
-  load(ch, pendingScroll);
+  keepPlace(book.id, signal, progress, save, (p) => {
+    if (p.chapter == null) return;
+    offerJump(`You read further on another device: ${(labels[p.chapter] || '').replace(/^\d+\.\s*/, '') || `chapter ${p.chapter + 1}`}.`, () => {
+      load(p.chapter, p.scroll || 0, '', p.anchor != null ? { anchor: p.anchor, anchorOffset: p.anchorOffset || 0 } : null);
+    });
+  });
+
+  load(ch, pendingScroll, '', pendingAnchor);
   return () => {
     save.flush();
     frame.src = 'about:blank';
@@ -532,6 +633,10 @@ function comicReader(book, signal) {
     }
   }, { signal });
   slider.addEventListener('input', () => show(Number(slider.value)), { signal });
+  keepPlace(book.id, signal, book.progress, save, (p) => {
+    if (p.page == null || p.page === page) return;
+    offerJump(`You're on page ${p.page + 1} on another device.`, () => show(p.page));
+  });
   $('modeBtn').addEventListener('click', () => { settings.mangaMode = settings.mangaMode === 'single' ? 'strip' : 'single'; saveSettings(); render(); }, { signal });
   $('dirBtn').addEventListener('click', () => { settings.mangaDir = settings.mangaDir === 'rtl' ? 'ltr' : 'rtl'; saveSettings(); render(); }, { signal });
   $('fitBtn').addEventListener('click', () => { settings.mangaFit = settings.mangaFit === 'width' ? 'height' : 'width'; saveSettings(); render(); }, { signal });
@@ -689,7 +794,7 @@ async function openTyping(id, params) {
     paint([]);
     updateStats(0);
     area.scrollTop = 0;
-    saveProgress(book.id, { typing: { chapter: ch, para }, chapter: ch, scroll: para / paras.length });
+    saveProgress(book.id, { typing: { chapter: ch, para }, chapter: ch, scroll: para / paras.length, anchor: null });
   }
 
   function paint(typedChars) {

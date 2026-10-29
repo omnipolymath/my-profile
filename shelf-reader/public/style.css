@@ -56,6 +56,15 @@ input[type="search"] { cursor: text; flex: 1; min-width: 120px; }
 .upload-row progress { width: 140px; accent-color: var(--accent); }
 .upload-row.err { color: var(--bad); }
 
+.continue { display: flex; align-items: center; gap: 14px; margin: 14px 16px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.continue img { width: 44px; height: 64px; object-fit: cover; border-radius: 4px; }
+.c-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.c-text small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; }
+.c-text b, .c-text span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-text span { font-size: 13px; }
+.lib-info { text-align: center; font-size: 12px; margin: 0 16px 30px; }
+.sync { display: flex; align-items: center; gap: 10px; border-radius: 14px; padding: 8px 8px 8px 16px; max-width: calc(100% - 32px); }
+.sync button { min-height: 32px; padding: 4px 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 18px; padding: 18px 16px 40px; }
 .card { position: relative; cursor: pointer; min-width: 0; }
 .cover {
@@ -141,6 +150,9 @@ input[type="search"] { cursor: text; flex: 1; min-width: 120px; }
   .stats b { font-size: 19px; }
   .t-current { font-size: 19px; }
   .keys { display: none; }
+  .continue { flex-wrap: wrap; }
+  .c-text { flex-basis: calc(100% - 60px); }
+  .continue button { flex: 1; justify-content: center; }
 }
 
 #reader.immersive .bar, #reader.immersive .comic-nav { display: none; }

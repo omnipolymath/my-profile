@@ -178,6 +178,14 @@ async function main() {
     assert.strictEqual(typing.totals.chars, 300);
     assert.strictEqual(typing.totals.bestWpm, 60);
 
+    // progress follows a renamed/moved file
+    fs.mkdirSync(path.join(lib, 'Moved'));
+    fs.renameSync(path.join(lib, 'My Novel.epub'), path.join(lib, 'Moved', 'Renamed.epub'));
+    const afterMove = await (await get('/api/books?refresh')).json();
+    const moved = afterMove.find((b) => b.file === 'Moved/Renamed.epub');
+    assert.ok(moved && moved.id !== novel.id);
+    assert.strictEqual(moved.progress && moved.progress.chapter, 1, 'progress kept after rename');
+
     const del = await fetch(`${base}/api/books/${manga.id}`, { method: 'DELETE', headers: auth });
     assert.strictEqual(del.status, 200);
     assert.ok(!fs.existsSync(path.join(lib, 'Manga Series', 'Chapter 1.cbz')));

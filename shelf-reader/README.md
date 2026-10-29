@@ -13,7 +13,7 @@ For novels there's also **Typing mode**: the book is shown one paragraph at a ti
   - *Simple punctuation* (on by default) turns curly quotes, em-dashes, `…` and accents into plain keyboard keys, so you don't get stuck on characters you can't type.
   - Pauses longer than 3 seconds don't count against your WPM, so you can stop and think.
   - Lifetime stats (characters typed, average WPM, accuracy, best paragraph) appear on the library page.
-- **Progress is stored on the server**, so you can start on your PC and keep going on your phone.
+- **Your books and your place are stored on the NAS** (see below), so nothing is lost if you clear your browser or switch devices.
 - No database and no npm dependencies. It's one small Node.js process.
 
 ## Install on a NAS (Docker)
@@ -41,6 +41,18 @@ Works on anything that runs Docker: Synology (Container Manager), QNAP (Containe
 | `PORT`            | `8080`         | Port inside the container                                    |
 | `LIBRARY_DIR`     | `/library`     | Where book files live (scanned recursively)                  |
 | `DATA_DIR`        | `/data`        | Where `state.json` (progress + typing stats) is saved        |
+
+### Where your books and your place are kept
+
+- **Books:** every upload is saved as a normal file in the library folder (`/library`), so it's on your NAS's own disks. You can browse, back up or copy those files like any others.
+- **Your place in each book:** saved to `state.json` in the data folder (`/data`). This happens a moment after you stop scrolling or turn a page, and immediately when you lock your phone, switch apps or close the tab. Reading progress, typing progress and typing stats all live in that one file, so back it up along with your books.
+  - Novels remember the exact paragraph you were on, not just a percentage, so you land in the same spot on a phone and a PC, and changing font size doesn't lose your place.
+  - Manga remembers the page.
+  - Your place stays with a book even if you rename the file or move it to another folder on the NAS.
+- **Switching devices:** open a book on another device and it starts where you left off. If a tab is still open on the old device, you'll see *"You read further on another device. Jump there?"* when you come back to it.
+- The library page has a **Continue where you left off** button for the last book you were reading.
+
+Rebuilding or updating the container doesn't touch either folder.
 
 ### Organising files
 

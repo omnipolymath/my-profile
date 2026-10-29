@@ -31,7 +31,14 @@
     </header>
     <div id="typingSummary" class="typing-summary" hidden></div>
     <div id="uploads" class="uploads"></div>
+    <div id="continue" class="continue" hidden>
+      <img alt="">
+      <div class="c-text"><small>Continue where you left off</small><b class="c-title"></b><span class="c-where muted"></span></div>
+      <button class="c-read primary">Continue</button>
+      <button class="c-type ghost">⌨ Type</button>
+    </div>
     <div id="grid" class="grid"></div>
+    <p id="libInfo" class="lib-info muted"></p>
     <div id="empty" class="empty" hidden>
       <p><strong>Your shelf is empty.</strong></p>
       <p>Drag &amp; drop <code>.epub</code> novels or <code>.cbz</code> / <code>.zip</code> manga here, or press Upload.</p>
@@ -110,6 +117,7 @@
   </section>
 
   <div id="toast" class="toast" hidden></div>
+  <div id="syncBar" class="toast sync" hidden><span></span><button class="jump primary">Jump there</button><button class="dismiss ghost" title="Stay here">✕</button></div>
   <script src="app.js"></script>
 </body>
 </html>
