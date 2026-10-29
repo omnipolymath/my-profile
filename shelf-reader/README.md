@@ -5,15 +5,19 @@ Shelf is a small web app you run on your NAS. Upload your **EPUB** novels and **
 For novels there's also **Typing mode**: the book is shown one paragraph at a time and you type it as you read. You get live WPM and accuracy, and your reading position moves along with your typing.
 
 - **Library:** covers, search, filter (novels / manga), sort by recently read. Upload by drag-and-drop or the Upload button.
-- **Novel reader:** chapter list, font size, dark / sepia / light themes, remembers where you stopped.
+- **Calm, clean look:** soft off-black / off-white colours, no harsh contrast. One **light/dark switch** flips between a dark background with light text and the opposite. Manga always stays on a dark background, so the switch isn't offered there.
+- **Novel reader**, with all settings under the **Aa** button:
+  - 8 bundled fonts, stored on your NAS (no internet needed): Literata, Lora, Merriweather, Source Serif, Atkinson Hyperlegible (made for low vision), Inter, OpenDyslexic and JetBrains Mono, or the book's own font.
+  - Text size, line spacing and page width.
+  - **Focus aid**, for when it's hard to keep your place:
+    - *Highlight sentence* highlights the sentence you're on. Move it with ↓ / ↑ or the round buttons, or tap any sentence.
+    - *Reading ruler* is a bar over the line you're reading that shades everything else. Drag it, step it a line at a time with ↓ / ↑, or tap a line.
 - **Manga reader:** single page or long-strip (webtoon) mode, right-to-left or left-to-right, fit height or fit width, page slider. Tap the left or right side to turn pages, tap the middle to hide the toolbars.
-- **Typing practice:**
-  - Starts exactly where you're reading. Typing to the end of a chapter rolls into the next one.
-  - Mistakes show in red. Fix them with Backspace before the paragraph completes.
-  - *Simple punctuation* (on by default) turns curly quotes, em-dashes, `…` and accents into plain keyboard keys, so you don't get stuck on characters you can't type.
-  - Pauses longer than 3 seconds don't count against your WPM, so you can stop and think.
-  - Lifetime stats (characters typed, average WPM, accuracy, best paragraph) appear on the library page.
-- **Your books and your place are stored on the NAS** (see below), so nothing is lost if you clear your browser or switch devices.
+- **Typing**, in the *Typing* tab:
+  - **Practice (works like keybr.com):** you start with 6 letters and type short lessons of made-up but pronounceable words that use only the letters you've unlocked. Each lesson leans on your slowest letter. When every letter reaches your target speed (35 WPM by default, adjustable), the next letter unlocks. A mistake stops the cursor until you press the right key. The row of letters shows how close each one is to target.
+  - **Speed tests:** 15 s, 30 s, 1 min or 2 min, using common words or passages **from your own novels, only from parts you've already reached, so there are no spoilers**.
+  - **Progress:** a speed-over-time chart, personal bests, recent results, and a keyboard map of the **letters you miss most**, including which key you usually hit instead.
+  - **Type the book:** press *Type* while reading and type the novel paragraph by paragraph from where you are. Your reading position moves with you. *Simple punctuation* turns curly quotes, dashes and accents into plain keys.
 - No database and no npm dependencies. It's one small Node.js process.
 
 ## Install on a NAS (Docker)
@@ -45,7 +49,7 @@ Works on anything that runs Docker: Synology (Container Manager), QNAP (Containe
 ### Where your books and your place are kept
 
 - **Books:** every upload is saved as a normal file in the library folder (`/library`), so it's on your NAS's own disks. You can browse, back up or copy those files like any others.
-- **Your place in each book:** saved to `state.json` in the data folder (`/data`). This happens a moment after you stop scrolling or turn a page, and immediately when you lock your phone, switch apps or close the tab. Reading progress, typing progress and typing stats all live in that one file, so back it up along with your books.
+- **Your place in each book, typing history, unlocked letters and per-letter stats:** saved to `state.json` in the data folder (`/data`). This happens a moment after you stop scrolling or turn a page, and immediately when you lock your phone, switch apps or close the tab. Reading progress, typing progress and typing stats all live in that one file, so back it up along with your books.
   - Novels remember the exact paragraph you were on, not just a percentage, so you land in the same spot on a phone and a PC, and changing font size doesn't lose your place.
   - Manga remembers the page.
   - Your place stays with a book even if you rename the file or move it to another folder on the NAS.
@@ -94,10 +98,16 @@ READER_PASSWORD=change-me LIBRARY_DIR=/path/to/books node server.js
 |--------------|---------------------------------------------------|
 | Novel reader | ← / → previous / next chapter                     |
 | Manga reader | ← / → turn page (follows reading direction), Space / PageDown next |
-| Typing       | Esc pause · Ctrl+→ skip paragraph · Ctrl+← previous paragraph |
+| Novel reader with a focus aid on | ↓ / ↑ move the highlight or ruler |
+| Typing a book | Esc pause · Ctrl+→ skip paragraph · Ctrl+← previous paragraph |
+| Practice / speed test | Tab new lesson or test · Esc pause |
 
 ## Development
 
 ```bash
 npm test   # builds a sample EPUB + CBZ and exercises the whole API
 ```
+
+## Credits
+
+The bundled fonts are under the SIL Open Font License; see `public/fonts/LICENSES.txt`. They come from the [Fontsource](https://fontsource.org) packages.

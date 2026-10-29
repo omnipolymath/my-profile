@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#16161a">
+  <meta name="theme-color" content="#18191c">
   <title>Shelf</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='5' width='7' height='22' rx='1.5' fill='%23e8a54b'/%3E%3Crect x='13' y='8' width='6' height='19' rx='1.5' fill='%236aa9e9'/%3E%3Crect x='21' y='6' width='7' height='21' rx='1.5' transform='rotate(8 24 16)' fill='%23d46a6a'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='5' width='6' height='22' rx='1.5' fill='%2390a8c3'/%3E%3Crect x='13' y='8' width='6' height='19' rx='1.5' fill='%23a3b89a'/%3E%3Crect x='21' y='6' width='6' height='21' rx='1.5' transform='rotate(8 24 16)' fill='%23c9a98a'/%3E%3C/svg%3E">
+  <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts/fonts.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
@@ -14,6 +16,14 @@
   <section id="library" class="view" hidden>
     <header class="bar">
       <h1 class="brand">Shelf</h1>
+      <nav class="tabs">
+        <a href="#/" class="tab active">Library</a>
+        <a href="#/tests" class="tab">Typing</a>
+      </nav>
+      <div class="spacer"></div>
+      <button class="theme-switch"></button>
+    </header>
+    <div class="toolbar">
       <input id="search" type="search" placeholder="Search title, author, folder…" autocomplete="off">
       <select id="filter" aria-label="Filter">
         <option value="all">All</option>
@@ -26,16 +36,15 @@
         <option value="title">Title</option>
       </select>
       <button id="uploadBtn" class="primary">Upload</button>
-      <button id="themeBtn" class="ghost" title="Change theme">🌓</button>
       <input id="fileInput" type="file" multiple accept=".epub,.cbz,.zip" hidden>
-    </header>
+    </div>
     <div id="typingSummary" class="typing-summary" hidden></div>
     <div id="uploads" class="uploads"></div>
     <div id="continue" class="continue" hidden>
       <img alt="">
       <div class="c-text"><small>Continue where you left off</small><b class="c-title"></b><span class="c-where muted"></span></div>
       <button class="c-read primary">Continue</button>
-      <button class="c-type ghost">⌨ Type</button>
+      <button class="c-type">Type it</button>
     </div>
     <div id="grid" class="grid"></div>
     <p id="libInfo" class="lib-info muted"></p>
@@ -50,14 +59,12 @@
   <!-- Reader (EPUB + manga) -->
   <section id="reader" class="view" hidden>
     <header class="bar reader-bar">
-      <a class="ghost btn" href="#/" title="Library">←</a>
+      <a class="btn ghost icon" href="#/" title="Library" aria-label="Library">←</a>
       <div class="reader-title"><span id="rTitle"></span><small id="rSub"></small></div>
       <div id="epubTools" class="tools">
         <select id="tocSelect" aria-label="Chapter"></select>
-        <button id="fontDown" class="ghost" title="Smaller text">A−</button>
-        <button id="fontUp" class="ghost" title="Larger text">A+</button>
-        <button id="rTheme" class="ghost" title="Theme">🌓</button>
-        <button id="typeHere" class="primary" title="Practise typing from this chapter">⌨ Type</button>
+        <button id="aaBtn" class="ghost" title="Text settings" aria-expanded="false">Aa</button>
+        <button id="typeHere" class="primary" title="Practise typing from here">Type</button>
       </div>
       <div id="comicTools" class="tools">
         <button id="modeBtn" class="ghost" title="Single page / long strip"></button>
@@ -65,8 +72,47 @@
         <button id="fitBtn" class="ghost" title="Fit"></button>
       </div>
     </header>
+    <div id="readPanel" class="panel" hidden>
+      <div class="panel-row">
+        <span class="panel-label">Background</span>
+        <button class="theme-switch"></button>
+      </div>
+      <div class="panel-row col">
+        <span class="panel-label">Font</span>
+        <div id="fontChoices" class="font-choices"></div>
+      </div>
+      <label class="panel-row">
+        <span class="panel-label">Size</span>
+        <input id="sizeRange" type="range" min="14" max="32" step="1">
+        <output id="sizeOut"></output>
+      </label>
+      <label class="panel-row">
+        <span class="panel-label">Line spacing</span>
+        <input id="lineRange" type="range" min="1.3" max="2.2" step="0.05">
+        <output id="lineOut"></output>
+      </label>
+      <div class="panel-row">
+        <span class="panel-label">Width</span>
+        <div class="segmented" id="widthSeg">
+          <button data-v="narrow">Narrow</button><button data-v="medium">Medium</button><button data-v="wide">Wide</button>
+        </div>
+      </div>
+      <div class="panel-row col">
+        <span class="panel-label">Focus aid <small class="muted">helps you keep your place while reading</small></span>
+        <div class="segmented" id="focusSeg">
+          <button data-v="off">Off</button><button data-v="sentence">Highlight sentence</button><button data-v="ruler">Reading ruler</button>
+        </div>
+        <small class="muted hint" id="focusHint"></small>
+      </div>
+    </div>
     <div id="epubPane" class="pane">
-      <iframe id="chapter" sandbox="allow-same-origin" title="Chapter"></iframe>
+      <div class="frame-wrap">
+        <iframe id="chapter" sandbox="allow-same-origin" title="Chapter"></iframe>
+        <div id="focusNav" class="focus-nav" hidden>
+          <button id="focusUp" title="Previous (↑)" aria-label="Previous">▲</button>
+          <button id="focusDown" title="Next (↓)" aria-label="Next">▼</button>
+        </div>
+      </div>
       <footer class="chapter-nav">
         <button id="prevCh" class="ghost">‹ Prev</button>
         <span id="chInfo" class="muted"></span>
@@ -83,17 +129,18 @@
     </div>
   </section>
 
-  <!-- Typing practice -->
+  <!-- Typing practice (type the book) -->
   <section id="typing" class="view" hidden>
     <header class="bar reader-bar">
-      <a class="ghost btn" href="#/" title="Library">←</a>
+      <a class="btn ghost icon" href="#/" title="Library" aria-label="Library">←</a>
       <div class="reader-title"><span id="tTitle"></span><small id="tSub"></small></div>
       <div class="tools">
         <select id="tChapter" aria-label="Chapter"></select>
         <label class="check" title="Turn curly quotes, dashes, ellipses and accents into plain keyboard characters">
           <input id="tSimplify" type="checkbox"> Simple punctuation
         </label>
-        <button id="tRead" class="ghost">📖 Read</button>
+        <button class="theme-switch"></button>
+        <button id="tRead" class="ghost">Read</button>
       </div>
     </header>
     <div class="stats">
@@ -116,8 +163,109 @@
     </footer>
   </section>
 
+  <!-- Typing tests -->
+  <section id="tests" class="view" hidden>
+    <header class="bar">
+      <h1 class="brand">Shelf</h1>
+      <nav class="tabs">
+        <a href="#/" class="tab">Library</a>
+        <a href="#/tests" class="tab active">Typing</a>
+      </nav>
+      <div class="spacer"></div>
+      <button class="theme-switch"></button>
+    </header>
+    <main class="tests-main">
+      <div class="mode-row">
+        <div class="segmented big" id="modeSeg">
+          <button data-v="practice">Practice</button><button data-v="speed">Speed test</button>
+        </div>
+      </div>
+
+      <!-- keybr-style adaptive practice -->
+      <div id="practicePane">
+        <div id="keyChips" class="key-chips" aria-label="Letters and how close each is to your target speed"></div>
+        <div class="practice-meta">
+          <span id="unlockInfo" class="muted"></span>
+          <label class="muted">Target speed
+            <select id="targetSel"></select>
+          </label>
+          <button id="resetPractice" class="ghost small">Start over</button>
+        </div>
+        <div class="lesson-stats">
+          <div><b id="lSpeed">–</b><span>WPM <i id="lSpeedD"></i></span></div>
+          <div><b id="lAcc">–</b><span>accuracy <i id="lAccD"></i></span></div>
+          <div><b id="lFocus">–</b><span>focus letter</span></div>
+          <div><b id="lCount">0</b><span>lessons today</span></div>
+        </div>
+      </div>
+
+      <!-- timed speed test -->
+      <div id="speedPane">
+        <div class="test-options">
+          <div class="segmented" id="durSeg" aria-label="Length">
+            <button data-v="15">15s</button><button data-v="30">30s</button><button data-v="60">1 min</button><button data-v="120">2 min</button>
+          </div>
+          <div class="segmented" id="srcSeg" aria-label="Text">
+            <button data-v="words">Common words</button><button data-v="books">From my books</button>
+          </div>
+        </div>
+        <p id="testSource" class="test-source muted"></p>
+      </div>
+
+      <div id="testBox" class="test-box">
+        <div class="test-live"><span id="tLeft"></span><span id="tLiveWpm" class="muted"></span></div>
+        <div id="testWords" class="test-words"></div>
+        <div id="testPaused" class="t-paused">Click here or start typing</div>
+        <textarea id="testInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Typing input"></textarea>
+      </div>
+
+      <div id="testResult" class="test-result" hidden>
+        <div class="hero"><b id="rWpm"></b><span>WPM</span></div>
+        <div class="result-grid">
+          <div><b id="rAcc"></b><span>accuracy</span></div>
+          <div><b id="rRaw"></b><span>raw WPM</span></div>
+          <div><b id="rChars"></b><span>characters</span></div>
+          <div><b id="rBest"></b><span id="rBestLabel">personal best</span></div>
+        </div>
+        <p id="rMissed" class="muted"></p>
+      </div>
+
+      <div class="test-actions">
+        <button id="testRestart" class="primary">New test</button>
+        <select id="testFont" aria-label="Typing font"></select>
+        <span class="muted keys" id="keysHint"></span>
+      </div>
+
+      <section class="progress-section">
+        <h2>Your progress</h2>
+        <div id="bests" class="bests"></div>
+        <div class="card-panel">
+          <h3 id="chartTitle">Speed over time</h3>
+          <div id="wpmChart" class="chart"></div>
+        </div>
+        <div class="card-panel">
+          <h3>Letters you miss most <small class="muted">from practice, speed tests and typing your books</small></h3>
+          <div id="keyboard" class="keyboard"></div>
+          <div class="legend-scale"><span>fewer mistakes</span><i></i><span>more mistakes</span></div>
+          <div id="weakList" class="weak-list"></div>
+        </div>
+        <div class="card-panel">
+          <h3 id="historyTitle">Recent</h3>
+          <table id="history" class="history"><thead><tr><th>When</th><th>WPM</th><th>Accuracy</th><th>Length</th><th>Text</th></tr></thead><tbody></tbody></table>
+        </div>
+      </section>
+    </main>
+  </section>
+
   <div id="toast" class="toast" hidden></div>
   <div id="syncBar" class="toast sync" hidden><span></span><button class="jump primary">Jump there</button><button class="dismiss ghost" title="Stay here">✕</button></div>
-  <script src="app.js"></script>
+  <div id="tooltip" class="tooltip" hidden></div>
+  <script src="js/core.js"></script>
+  <script src="js/text.js"></script>
+  <script src="js/library.js"></script>
+  <script src="js/reader.js"></script>
+  <script src="js/focus.js"></script>
+  <script src="js/typing.js"></script>
+  <script src="js/tests.js"></script>
 </body>
 </html>

@@ -178,13 +178,45 @@ async function main() {
     assert.strictEqual(typing.totals.chars, 300);
     assert.strictEqual(typing.totals.bestWpm, 60);
 
+    // typing tests, per-letter stats and keybr-style practice state
+    const posted = await fetch(`${base}/api/tests`, {
+      method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'lesson', duration: 20, wpm: 41.5, raw: 44, acc: 96.5, chars: 60, errors: 2,
+        letters: { e: [20, 1, 4000, 19], t: [10, 2, 3000, 9] }, confusions: { t: { r: 2 } } }),
+    });
+    assert.strictEqual(posted.status, 201);
+    assert.strictEqual((await fetch(`${base}/api/adaptive`, {
+      method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ unlocked: 99, target: 35 }),
+    })).status, 400, 'bad practice state rejected');
+    await fetch(`${base}/api/adaptive`, {
+      method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unlocked: 7, target: 40, keys: { e: { speed: 42.3, lessons: 3 }, '<b>': { speed: 1, lessons: 1 } } }),
+    });
+    const tests = await (await get('/api/tests')).json();
+    assert.strictEqual(tests.tests.length, 1);
+    assert.deepStrictEqual(tests.letters.t, [10, 2, 3000, 9]);
+    assert.strictEqual(tests.confusions.t.r, 2);
+    assert.deepStrictEqual(tests.adaptive, { unlocked: 7, target: 40, keys: { e: { speed: 42.3, lessons: 3 } } });
+
+    // furthest position never goes backwards (keeps typing-test passages spoiler free)
+    await fetch(`${base}/api/books/${novel.id}/progress`, {
+      method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ chapter: 0, scroll: 0.1 }),
+    });
+    const back = await (await get(`/api/books/${novel.id}/progress`)).json();
+    assert.strictEqual(back.furthest, 1.5);
+
+    // fonts are served and cached
+    const font = await get('/fonts/literata-latin-wght-normal.woff2');
+    assert.strictEqual(font.headers.get('content-type'), 'font/woff2');
+    assert.match(font.headers.get('cache-control'), /immutable/);
+
     // progress follows a renamed/moved file
     fs.mkdirSync(path.join(lib, 'Moved'));
     fs.renameSync(path.join(lib, 'My Novel.epub'), path.join(lib, 'Moved', 'Renamed.epub'));
     const afterMove = await (await get('/api/books?refresh')).json();
     const moved = afterMove.find((b) => b.file === 'Moved/Renamed.epub');
     assert.ok(moved && moved.id !== novel.id);
-    assert.strictEqual(moved.progress && moved.progress.chapter, 1, 'progress kept after rename');
+    assert.strictEqual(moved.progress && moved.progress.furthest, 1.5, 'progress kept after rename');
 
     const del = await fetch(`${base}/api/books/${manga.id}`, { method: 'DELETE', headers: auth });
     assert.strictEqual(del.status, 200);

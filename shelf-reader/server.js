@@ -49,10 +49,11 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 
 // ---------- persistent state (progress + typing stats) ----------
 
-let state = { progress: {}, typing: { totals: {}, days: {}, books: {} } };
+let state = { progress: {}, typing: { totals: {}, days: {}, books: {} }, keys: { letters: {}, confusions: {} }, tests: [] };
 try {
   state = { ...state, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) };
 } catch { /* first run */ }
+const MAX_TESTS = 2000;
 
 let saveTimer = null;
 function saveState() {
@@ -79,6 +80,7 @@ function kindOf(name) {
   return null;
 }
 
+const clamp01 = (v) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), 0.9999) : 0);
 const idFor = (rel) => crypto.createHash('sha1').update(rel).digest('hex').slice(0, 16);
 
 async function walk(dir, out) {
@@ -259,7 +261,9 @@ async function serveStatic(res, urlPath) {
   if (!file.startsWith(PUBLIC_DIR + path.sep)) return send(res, 404, 'Not found');
   try {
     const data = await fsp.readFile(file);
-    send(res, 200, data, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    // Fonts never change; everything else is revalidated so app updates show up right away.
+    const cache = rel.startsWith('fonts/') && rel.endsWith('.woff2') ? 'public, max-age=31536000, immutable' : 'no-cache';
+    send(res, 200, data, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': cache });
   } catch {
     send(res, 404, 'Not found');
   }
@@ -296,7 +300,70 @@ async function handleUpload(req, res) {
   json(res, 201, book ? summary(book) : { id });
 }
 
+// Per-key accuracy, shared by typing practice and typing tests.
+// letters[char] = [correct, missed, msSum, msCount]; confusions[expected][typed] = count
+function recordKeys(body) {
+  const { letters, confusions } = state.keys;
+  if (body.letters && typeof body.letters === 'object') {
+    for (const [ch, v] of Object.entries(body.letters)) {
+      if ([...ch].length !== 1 || !Array.isArray(v)) continue;
+      const cur = letters[ch] || (letters[ch] = [0, 0, 0, 0]);
+      for (let i = 0; i < 4; i++) cur[i] += Number.isFinite(v[i]) && v[i] > 0 ? Math.min(v[i], 1e7) : 0;
+    }
+  }
+  if (body.confusions && typeof body.confusions === 'object') {
+    for (const [want, typedMap] of Object.entries(body.confusions)) {
+      if ([...want].length !== 1 || !typedMap || typeof typedMap !== 'object') continue;
+      const cur = confusions[want] || (confusions[want] = {});
+      for (const [got, n] of Object.entries(typedMap)) {
+        if ([...got].length === 1 && Number.isFinite(n) && n > 0) cur[got] = (cur[got] || 0) + Math.min(n, 1e5);
+      }
+    }
+  }
+}
+
+const SOURCES = new Set(['words', 'books', 'lesson']);
+
+// keybr-style practice state: how many letters are unlocked, the target speed, and a
+// smoothed speed per letter. The browser computes it; we just validate and keep it.
+function cleanAdaptive(body) {
+  const unlocked = Math.round(Number(body.unlocked));
+  const target = Math.round(Number(body.target));
+  if (!(unlocked >= 1 && unlocked <= 26) || !(target >= 10 && target <= 200)) return null;
+  const keys = {};
+  for (const [k, v] of Object.entries(body.keys || {})) {
+    if (!/^[a-z]$/.test(k) || !v || typeof v !== 'object') continue;
+    const speed = Number(v.speed);
+    const lessons = Math.round(Number(v.lessons));
+    if (Number.isFinite(speed) && speed >= 0 && Number.isFinite(lessons) && lessons >= 0) {
+      keys[k] = { speed: Math.min(Math.round(speed * 10) / 10, 400), lessons: Math.min(lessons, 1e6) };
+    }
+  }
+  return { unlocked, target, keys };
+}
+function recordTest(body) {
+  const num = (v, max) => (Number.isFinite(v) && v >= 0 ? Math.min(v, max) : 0);
+  const test = {
+    at: Date.now(),
+    duration: num(body.duration, 3600),
+    source: SOURCES.has(body.source) ? body.source : 'words',
+    label: typeof body.label === 'string' ? body.label.slice(0, 200) : '',
+    wpm: Math.round(num(body.wpm, 400) * 10) / 10,
+    raw: Math.round(num(body.raw, 400) * 10) / 10,
+    acc: Math.round(num(body.acc, 100) * 10) / 10,
+    chars: num(body.chars, 1e6),
+    errors: num(body.errors, 1e6),
+  };
+  if (!test.chars) return null;
+  state.tests.push(test);
+  if (state.tests.length > MAX_TESTS) state.tests.splice(0, state.tests.length - MAX_TESTS);
+  recordKeys(body);
+  saveState();
+  return test;
+}
+
 function recordTyping(body) {
+  recordKeys(body);
   const n = (v) => (Number.isFinite(v) && v >= 0 ? v : 0);
   const delta = { chars: n(body.chars), keystrokes: n(body.keystrokes), errors: n(body.errors), ms: Math.min(n(body.ms), 3.6e6) };
   if (!delta.chars) return;
@@ -331,6 +398,18 @@ async function route(req, res) {
   }
   if (p === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
   if (p === '/api/typing' && req.method === 'GET') return json(res, 200, state.typing);
+  if (p === '/api/tests' && req.method === 'GET') return json(res, 200, { tests: state.tests, ...state.keys, adaptive: state.adaptive || null });
+  if (p === '/api/adaptive' && req.method === 'PUT') {
+    const adaptive = cleanAdaptive(await readJson(req));
+    if (!adaptive) return json(res, 400, { error: 'Invalid practice state' });
+    state.adaptive = adaptive;
+    saveState();
+    return json(res, 200, adaptive);
+  }
+  if (p === '/api/tests' && req.method === 'POST') {
+    const test = recordTest(await readJson(req));
+    return test ? json(res, 201, test) : json(res, 400, { error: 'Empty test' });
+  }
   if (p === '/api/typing' && req.method === 'POST') {
     recordTyping(await readJson(req));
     return json(res, 200, state.typing.totals);
@@ -363,7 +442,12 @@ async function route(req, res) {
   if (action === 'progress') {
     if (req.method === 'PUT') {
       const body = await readJson(req);
-      state.progress[id] = { ...(state.progress[id] || {}), ...body, fp: book.fp, updated: Date.now() };
+      const prev = state.progress[id] || {};
+      const next = { ...prev, ...body, fp: book.fp, updated: Date.now() };
+      // The furthest point you've reached, used to keep typing-test passages spoiler free.
+      const pos = book.kind === 'epub' ? (Number(next.chapter) || 0) + clamp01(next.scroll) : Number(next.page) || 0;
+      next.furthest = Math.max(Number(prev.furthest) || 0, pos);
+      state.progress[id] = next;
       saveState();
     }
     return json(res, 200, state.progress[id] || {});
