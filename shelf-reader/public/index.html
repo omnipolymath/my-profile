@@ -20,6 +20,7 @@
         <a href="#/" class="tab active">Library</a>
         <a href="#/tests" class="tab">Typing</a>
         <a href="#/quotes" class="tab">Quotes</a>
+        <a href="#/notes" class="tab">Notes</a>
       </nav>
       <div class="spacer"></div>
       <button class="theme-switch"></button>
@@ -64,6 +65,7 @@
       <div class="reader-title"><span id="rTitle"></span><small id="rSub"></small></div>
       <div id="epubTools" class="tools">
         <select id="tocSelect" aria-label="Chapter"></select>
+        <button id="notesBtn" class="ghost" title="Notes (saved to Obsidian)" aria-expanded="false">Notes</button>
         <button id="aaBtn" class="ghost" title="Text settings" aria-expanded="false">Aa</button>
         <button id="typeHere" class="primary" title="Practise typing from here">Type</button>
       </div>
@@ -71,6 +73,7 @@
         <button id="modeBtn" class="ghost" title="Single page / long strip"></button>
         <button id="dirBtn" class="ghost" title="Reading direction"></button>
         <button id="fitBtn" class="ghost" title="Fit"></button>
+        <button id="notesBtnComic" class="ghost" title="Notes (saved to Obsidian)" aria-expanded="false">Notes</button>
       </div>
     </header>
     <div id="readPanel" class="panel" hidden>
@@ -106,10 +109,30 @@
         <small class="muted hint" id="focusHint"></small>
       </div>
     </div>
+    <aside id="notesPanel" class="notes-panel" hidden>
+      <div class="np-head">
+        <h3>Notes <small id="npPlace" class="muted"></small></h3>
+        <a id="npObsidian" class="btn ghost small" hidden>Open in Obsidian</a>
+        <button id="npClose" class="ghost icon" aria-label="Close notes">✕</button>
+      </div>
+      <div class="np-compose">
+        <div id="npQuote" class="np-quote" hidden><blockquote></blockquote><button id="npQuoteClear" class="ghost small" aria-label="Remove quote">✕</button></div>
+        <textarea id="npText" rows="4" placeholder="Write a note…"></textarea>
+        <div class="np-compose-row">
+          <small class="muted">Markdown works · Ctrl+Enter to save</small>
+          <button id="npSave" class="primary">Save note</button>
+        </div>
+        <small id="npFile" class="muted np-file"></small>
+      </div>
+      <div id="npList" class="np-list"></div>
+    </aside>
     <div id="epubPane" class="pane">
       <div class="frame-wrap">
         <iframe id="chapter" sandbox="allow-same-origin" title="Chapter"></iframe>
-        <button id="selSave" class="sel-save primary" hidden>♡ Save quote</button>
+        <div id="selPop" class="sel-pop" hidden>
+          <button id="selSave" class="primary">♡ Save quote</button>
+          <button id="selNote">✎ Add note</button>
+        </div>
         <div id="focusNav" class="focus-nav" hidden>
           <button id="focusUp" title="Previous (↑)" aria-label="Previous">▲</button>
           <button id="focusDown" title="Next (↓)" aria-label="Next">▼</button>
@@ -173,6 +196,7 @@
         <a href="#/" class="tab">Library</a>
         <a href="#/tests" class="tab active">Typing</a>
         <a href="#/quotes" class="tab">Quotes</a>
+        <a href="#/notes" class="tab">Notes</a>
       </nav>
       <div class="spacer"></div>
       <button class="theme-switch"></button>
@@ -268,6 +292,7 @@
         <a href="#/" class="tab">Library</a>
         <a href="#/tests" class="tab">Typing</a>
         <a href="#/quotes" class="tab active">Quotes</a>
+        <a href="#/notes" class="tab">Notes</a>
       </nav>
       <div class="spacer"></div>
       <button class="theme-switch"></button>
@@ -296,6 +321,44 @@
     </main>
   </section>
 
+  <!-- Notes (Obsidian) -->
+  <section id="notes" class="view" hidden>
+    <header class="bar">
+      <h1 class="brand">Shelf</h1>
+      <nav class="tabs">
+        <a href="#/" class="tab">Library</a>
+        <a href="#/tests" class="tab">Typing</a>
+        <a href="#/quotes" class="tab">Quotes</a>
+        <a href="#/notes" class="tab active">Notes</a>
+      </nav>
+      <div class="spacer"></div>
+      <button class="theme-switch"></button>
+    </header>
+    <main id="notesLayout" class="notes-layout">
+      <aside class="note-side">
+        <form id="noteNewForm" class="note-new">
+          <input id="noteNewTitle" type="text" placeholder="New note title" autocomplete="off">
+          <button class="primary" type="submit">New</button>
+        </form>
+        <input id="noteSearch" type="search" placeholder="Search notes…" autocomplete="off">
+        <div id="noteList" class="note-list"></div>
+        <p id="vaultHint" class="muted vault-hint"></p>
+      </aside>
+      <section id="notePane" class="note-pane" hidden>
+        <div class="note-head">
+          <button id="noteBack" class="ghost icon note-back" aria-label="All notes">←</button>
+          <h2 id="noteTitle"></h2>
+          <div class="segmented" id="noteModeSeg"><button data-v="edit">Edit</button><button data-v="preview">Preview</button></div>
+          <a id="noteObsidian" class="btn ghost" hidden>Open in Obsidian</a>
+          <button id="noteDelete" class="ghost" title="Delete note">Delete</button>
+        </div>
+        <textarea id="noteEditor" class="note-editor" spellcheck="true" placeholder="Start writing… (Markdown: # heading, **bold**, - list, > quote, [[link]])"></textarea>
+        <div id="notePreview" class="note-preview md" hidden></div>
+        <p id="noteStatus" class="note-status muted"></p>
+      </section>
+    </main>
+  </section>
+
   <div id="toast" class="toast" hidden></div>
   <div id="syncBar" class="toast sync" hidden><span></span><button class="jump primary">Jump there</button><button class="dismiss ghost" title="Stay here">✕</button></div>
   <div id="tooltip" class="tooltip" hidden></div>
@@ -306,6 +369,7 @@
   <script src="js/focus.js"></script>
   <script src="js/typing.js"></script>
   <script src="js/quotes.js"></script>
+  <script src="js/notes.js"></script>
   <script src="js/tests.js"></script>
 </body>
 </html>

@@ -207,6 +207,7 @@ function route() {
   else if (parts[0] === 'type' && parts[1]) openTyping(parts[1], params).catch(fail);
   else if (parts[0] === 'tests') openTests(params).catch(fail);
   else if (parts[0] === 'quotes') openQuotes().catch(fail);
+  else if (parts[0] === 'notes') openNotes().catch(fail);
   else showLibrary();
 }
 

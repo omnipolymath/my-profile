@@ -219,6 +219,32 @@ async function main() {
     await fetch(`${base}/api/quotes/${q1.id}`, { method: 'DELETE', headers: auth });
     assert.strictEqual((await (await get('/api/quotes')).json()).length, 0);
 
+    // Obsidian notes: book notes + free notes are Markdown files in the vault
+    const added = await (await fetch(`${base}/api/books/${novel.id}/notes`, {
+      method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chapter: 0, chapterLabel: 'Chapter One', quote: 'The cat sat on the mat.', body: 'A *classic* line.' }),
+    })).json();
+    assert.match(added.path, /^Shelf\/Books\/The Test & Novel\.md$/);
+    const noteFile = path.join(dir, 'vault', added.path);
+    const md = fs.readFileSync(noteFile, 'utf8');
+    assert.match(md, /shelf-id: "[0-9a-f]{16}"/);
+    assert.match(md, /> The cat sat on the mat\./);
+    fs.appendFileSync(noteFile, '### Typed in Obsidian\nHello from the vault.\n');
+    const listed = await (await get(`/api/books/${novel.id}/notes`)).json();
+    assert.deepStrictEqual(listed.entries.map((e) => e.heading.split(' · ')[0]), ['Chapter One', 'Typed in Obsidian']);
+    assert.strictEqual((await fetch(`${base}/api/books/${novel.id}/notes/${listed.entries[0].id}`, { method: 'DELETE', headers: auth })).status, 200);
+    const free = await (await fetch(`${base}/api/notes`, {
+      method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Reading goals' }),
+    })).json();
+    const freeFile = await (await get(`/api/notes/file?path=${encodeURIComponent(free.path)}`)).json();
+    const stale = await fetch(`${base}/api/notes/file?path=${encodeURIComponent(free.path)}`, {
+      method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '# x', baseMtime: freeFile.mtime - 5000 }),
+    });
+    assert.strictEqual(stale.status, 409, 'refuses to overwrite a note changed elsewhere');
+    assert.strictEqual((await get('/api/notes/file?path=..%2F..%2Fstate.json')).status, 400, 'cannot read outside the notes folder');
+    const notesList = await (await get('/api/notes')).json();
+    assert.deepStrictEqual(notesList.map((n) => n.kind).sort(), ['book', 'note']);
+
     // fonts are served and cached
     const font = await get('/fonts/literata-latin-wght-normal.woff2');
     assert.strictEqual(font.headers.get('content-type'), 'font/woff2');

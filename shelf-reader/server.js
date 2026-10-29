@@ -10,10 +10,18 @@ const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const { openZip } = require('./lib/zip');
 const { parseEpub } = require('./lib/epub');
+const { createVault } = require('./lib/vault');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 const LIBRARY_DIR = path.resolve(process.env.LIBRARY_DIR || path.join(DATA_DIR, 'library'));
+// Obsidian: point OBSIDIAN_VAULT at your vault folder. Without it, notes go to <data>/vault,
+// which you can open as a vault in Obsidian later.
+const vault = createVault({
+  dir: process.env.OBSIDIAN_VAULT || path.join(DATA_DIR, 'vault'),
+  folder: (process.env.OBSIDIAN_FOLDER || 'Shelf').replace(/[\\/]+/g, '').trim() || 'Shelf',
+  name: process.env.OBSIDIAN_VAULT_NAME || '',
+});
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const USERNAME = process.env.READER_USER || 'reader';
 const PASSWORD = process.env.READER_PASSWORD || '';
@@ -380,6 +388,29 @@ function recordTest(body) {
   return test;
 }
 
+// Properties Shelf keeps up to date on each book's Obsidian note.
+function bookProgressProps(book) {
+  const p = state.progress[book.id] || {};
+  const length = book.kind === 'epub' ? book.meta.spine.length : book.meta.pages.length;
+  const done = book.kind === 'epub' ? (p.chapter || 0) + clamp01(p.scroll) : (p.page || 0) + 1;
+  return {
+    progress: `${length ? Math.min(100, Math.round((done / length) * 100)) : 0}%`,
+    'last-read': new Date(p.updated || Date.now()).toISOString().slice(0, 10),
+  };
+}
+
+let quotesTimer = null;
+function syncQuotesNote() {
+  clearTimeout(quotesTimer);
+  quotesTimer = setTimeout(async () => {
+    for (const q of state.quotes) {
+      const b = q.bookId && books.get(q.bookId);
+      if (b) await vault.findBookNote(b).catch(() => {});
+    }
+    vault.writeQuotes(state.quotes, (id) => vault.relBookPath(id)).catch((err) => console.error('Vault:', err.message));
+  }, 300);
+}
+
 function recordTyping(body) {
   recordKeys(body);
   const n = (v) => (Number.isFinite(v) && v >= 0 ? v : 0);
@@ -425,13 +456,41 @@ async function route(req, res) {
     if (dupe) return json(res, 200, dupe);
     state.quotes.push(quote);
     saveState();
+    const book = quote.bookId && books.get(quote.bookId);
+    if (book) {
+      // Quotes saved from a novel also go into that book's Obsidian note.
+      await vault.addBookNote(book, {
+        kind: 'quote', chapter: quote.chapter, quote: quote.text,
+        chapterLabel: quote.from.includes(' · ') ? quote.from.split(' · ').slice(1).join(' · ') : '',
+      }, bookProgressProps(book)).catch((err) => console.error('Vault:', err.message));
+    }
+    syncQuotesNote();
     return json(res, 201, quote);
   }
   const qm = /^\/api\/quotes\/([0-9a-f]{12})$/.exec(p);
   if (qm && req.method === 'DELETE') {
     state.quotes = state.quotes.filter((q) => q.id !== qm[1]);
     saveState();
+    syncQuotesNote();
     return json(res, 200, { ok: true });
+  }
+
+  // ----- Obsidian notes -----
+  if (p === '/api/vault' && req.method === 'GET') return json(res, 200, { folder: vault.folder, vaultName: vault.name, configured: !!process.env.OBSIDIAN_VAULT });
+  if (p === '/api/notes' && req.method === 'GET') return json(res, 200, await vault.list());
+  if (p === '/api/notes' && req.method === 'POST') {
+    const body = await readJson(req);
+    return json(res, 201, await vault.newNote(typeof body.title === 'string' ? body.title : '', typeof body.content === 'string' ? body.content : ''));
+  }
+  if (p === '/api/notes/file') {
+    const file = url.searchParams.get('path');
+    if (req.method === 'GET') return json(res, 200, await vault.getFile(file));
+    if (req.method === 'PUT') {
+      const body = await readJson(req, 5e6);
+      if (typeof body.content !== 'string') return json(res, 400, { error: 'Missing content' });
+      return json(res, 200, await vault.putFile(file, body.content, Number(body.baseMtime) || 0));
+    }
+    if (req.method === 'DELETE') { await vault.removeFile(file); return json(res, 200, { ok: true }); }
   }
   if (p === '/api/adaptive' && req.method === 'PUT') {
     const adaptive = cleanAdaptive(await readJson(req));
@@ -449,7 +508,7 @@ async function route(req, res) {
     return json(res, 200, state.typing.totals);
   }
 
-  const m = /^\/api\/books\/([0-9a-f]{16})(?:\/(cover|progress|res|page)(?:\/(.*))?)?$/.exec(p);
+  const m = /^\/api\/books\/([0-9a-f]{16})(?:\/(cover|progress|res|page|notes)(?:\/(.*))?)?$/.exec(p);
   if (!m) return json(res, 404, { error: 'Not found' });
   const [, id, action, rest] = m;
   const book = await getBook(id);
@@ -483,8 +542,36 @@ async function route(req, res) {
       next.furthest = Math.max(Number(prev.furthest) || 0, pos);
       state.progress[id] = next;
       saveState();
+      vault.touchProgress(book, bookProgressProps(book)).catch(() => {});
     }
     return json(res, 200, state.progress[id] || {});
+  }
+  if (action === 'notes') {
+    const meta = { ...summary(book), author: book.meta.author || '' };
+    if (!rest && req.method === 'GET') return json(res, 200, await vault.bookNotes(meta));
+    if (!rest && req.method === 'POST') {
+      const body = await readJson(req);
+      const text = (v) => (typeof v === 'string' ? v.slice(0, 20000) : '');
+      if (!text(body.body).trim() && !text(body.quote).trim()) return json(res, 400, { error: 'Write something first' });
+      const out = await vault.addBookNote(meta, {
+        chapter: Number.isInteger(body.chapter) ? body.chapter : null,
+        chapterLabel: text(body.chapterLabel).slice(0, 200),
+        quote: text(body.quote),
+        body: text(body.body),
+      }, bookProgressProps(book));
+      return json(res, 201, out);
+    }
+    if (rest && /^[\w-]{1,20}$/.test(rest)) {
+      if (req.method === 'PUT') {
+        const body = await readJson(req);
+        await vault.editBookNote(meta, rest, {
+          body: typeof body.body === 'string' ? body.body : null,
+          quote: typeof body.quote === 'string' ? body.quote : null,
+        });
+        return json(res, 200, { ok: true });
+      }
+      if (req.method === 'DELETE') { await vault.deleteBookNote(meta, rest); return json(res, 200, { ok: true }); }
+    }
   }
   if (action === 'cover') {
     if (!book.meta.cover) return send(res, 404, 'No cover');
@@ -503,7 +590,7 @@ async function route(req, res) {
 
 const server = http.createServer((req, res) => {
   route(req, res).catch((err) => {
-    console.error(err);
+    if (!err.status || err.status >= 500) console.error(err);
     if (!res.headersSent) json(res, err.status || 500, { error: err.message });
     else res.end();
   });
@@ -514,6 +601,7 @@ server.listen(PORT, () => {
   console.log(`Shelf listening on http://0.0.0.0:${PORT}`);
   console.log(`  library: ${LIBRARY_DIR}`);
   console.log(`  data:    ${DATA_DIR}`);
+  console.log(`  notes:   ${vault.base} (Obsidian)`);
   if (!PASSWORD) console.log('  WARNING: READER_PASSWORD is not set; anyone on your network can open the reader.');
   scan(true).then(() => console.log(`  ${books.size} book(s) found`));
 });

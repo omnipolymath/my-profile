@@ -250,6 +250,7 @@ function epubReader(book, params, signal) {
     ready = true;
     frame.style.visibility = '';
     focus.attach(doc);
+    notes.refresh();
     updateInfo();
     save();
 
@@ -274,7 +275,7 @@ function epubReader(book, params, signal) {
   }, { signal });
 
   function onKey(e) {
-    if (e.target.closest && e.target.closest('select, input')) return;
+    if (e.target.closest && e.target.closest('select, input, textarea')) return;
     if (settings.focus !== 'off' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       e.preventDefault();
       focus.move(e.key === 'ArrowDown' ? 1 : -1);
@@ -284,10 +285,17 @@ function epubReader(book, params, signal) {
   window.addEventListener('keydown', onKey, { signal });
 
   // Select text in the chapter to save it as a quote.
+  const notes = setupNotesPanel(book, () => ({
+    chapter: ch,
+    label: labels[ch].replace(/^\d+\.\s*/, ''),
+    goTo: (i) => load(i),
+  }), signal);
+
   const selection = (() => {
+    const pop = $('selPop');
     const btn = $('selSave');
     let picked = '';
-    const hide = () => { btn.hidden = true; picked = ''; };
+    const hide = () => { pop.hidden = true; picked = ''; };
     const check = debounce(() => {
       const doc = frame.contentDocument;
       const sel = doc && doc.getSelection();
@@ -296,12 +304,18 @@ function epubReader(book, params, signal) {
       const rect = sel.getRangeAt(0).getBoundingClientRect();
       picked = text;
       const below = rect.top < 50;
-      btn.style.left = `${clamp(rect.left + rect.width / 2, 70, frame.clientWidth - 70)}px`;
-      btn.style.top = `${clamp(below ? rect.bottom + 46 : rect.top - 8, 44, frame.clientHeight - 8)}px`;
+      pop.style.left = `${clamp(rect.left + rect.width / 2, 130, frame.clientWidth - 130)}px`;
+      pop.style.top = `${clamp(below ? rect.bottom + 50 : rect.top - 8, 48, frame.clientHeight - 8)}px`;
       btn.textContent = findSaved(text) ? '♥ Saved' : '♡ Save quote';
-      btn.hidden = false;
+      pop.hidden = false;
     }, 250);
-    btn.addEventListener('pointerdown', (e) => e.preventDefault(), { signal });
+    pop.addEventListener('pointerdown', (e) => e.preventDefault(), { signal });
+    $('selNote').addEventListener('click', () => {
+      const text = picked;
+      frame.contentDocument?.getSelection()?.removeAllRanges();
+      hide();
+      notes.open(text);
+    }, { signal });
     btn.addEventListener('click', async () => {
       if (!picked) return;
       try {
@@ -310,6 +324,7 @@ function epubReader(book, params, signal) {
           from: `${book.title} · ${labels[ch].replace(/^\d+\.\s*/, '')}`,
         });
         toast('Saved to your quotes ♥');
+        notes.refresh();
         frame.contentDocument?.getSelection()?.removeAllRanges();
       } catch (err) { toast(err.message); }
       hide();
@@ -321,6 +336,7 @@ function epubReader(book, params, signal) {
   const panel = setupReadPanel(signal, (kind) => {
     if (kind === 'focus') focus.refresh();
     else restyle();
+    notes.close();
   });
   themeListeners.add(restyle);
   signal.addEventListener('abort', () => themeListeners.delete(restyle));
@@ -382,6 +398,7 @@ function comicReader(book, signal) {
     }
     info();
     save();
+    notes?.refresh();
   }
   const next = () => { if (page < total - 1) show(page + 1); else toast('Last page'); };
   const prev = () => { if (page > 0) show(page - 1); };
@@ -437,7 +454,7 @@ function comicReader(book, signal) {
     if (forward) next(); else prev();
   }, { signal });
   window.addEventListener('keydown', (e) => {
-    if (e.target.closest('select, input')) return;
+    if (e.target.closest('select, input, textarea')) return;
     const rtl = settings.mangaDir === 'rtl' && settings.mangaMode === 'single';
     if (settings.mangaMode === 'single') {
       if (e.key === 'ArrowLeft') rtl ? next() : prev();
@@ -447,6 +464,7 @@ function comicReader(book, signal) {
     }
   }, { signal });
   slider.addEventListener('input', () => show(Number(slider.value)), { signal });
+  const notes = setupNotesPanel(book, () => ({ chapter: null, label: `Page ${page + 1}` }), signal);
   keepPlace(book.id, signal, book.progress, save, (p) => {
     if (p.page == null || p.page === page) return;
     offerJump(`You're on page ${p.page + 1} on another device.`, () => show(p.page));

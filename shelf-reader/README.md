@@ -13,6 +13,12 @@ For novels there's also **Typing mode**: the book is shown one paragraph at a ti
     - *Highlight sentence* highlights the sentence you're on. Move it with ↓ / ↑ or the round buttons, or tap any sentence.
     - *Reading ruler* is a bar over the line you're reading that shades everything else. Drag it, step it a line at a time with ↓ / ↑, or tap a line.
 - **Quotes** tab: a random famous or anime quote to discover (save it, type it, or get another), plus **all your saved quotes**. You can filter them (quotes, anime, from my books), type them, copy them, or jump back to the book. To save a line from a novel, just **select it while reading** and tap *Save quote*. Anime lines are common English translations, so wording can differ slightly between subs and dubs.
+- **Notes, saved to Obsidian:**
+  - Press **Notes** while reading, or select text and tap **✎ Add note** to quote it.
+  - Each book gets its own page in your vault (`Shelf/Books/<Title>.md`) with Obsidian properties: author, progress and last read.
+  - Quotes you save from a novel are added to that page too.
+  - The **Notes** tab is an editor for anything else (`Shelf/Notes/…`), with a Markdown preview.
+  - Edits you make in Obsidian show up in Shelf, and **Open in Obsidian** jumps to the note.
 - **Manga reader:** single page or long-strip (webtoon) mode, right-to-left or left-to-right, fit height or fit width, page slider. Tap the left or right side to turn pages, tap the middle to hide the toolbars.
 - **Typing**, in the *Typing* tab:
   - **Practice (works like keybr.com):** you start with 6 letters and type short lessons of made-up but pronounceable words that use only the letters you've unlocked. Each lesson leans on your slowest letter. When every letter reaches your target speed (35 WPM by default, adjustable), the next letter unlocks. A mistake stops the cursor until you press the right key. The row of letters shows how close each one is to target.
@@ -47,6 +53,9 @@ Works on anything that runs Docker: Synology (Container Manager), QNAP (Containe
 | `PORT`            | `8080`         | Port inside the container                                    |
 | `LIBRARY_DIR`     | `/library`     | Where book files live (scanned recursively)                  |
 | `DATA_DIR`        | `/data`        | Where `state.json` (progress + typing stats) is saved        |
+| `OBSIDIAN_VAULT`  | `/vault` in Docker | Your Obsidian vault folder (notes go in its `Shelf/` folder) |
+| `OBSIDIAN_VAULT_NAME` | *(empty)*  | Your vault's name, to turn on "Open in Obsidian" links       |
+| `OBSIDIAN_FOLDER` | `Shelf`        | Folder inside the vault that Shelf uses                      |
 
 ### Where your books and your place are kept
 
@@ -59,6 +68,28 @@ Works on anything that runs Docker: Synology (Container Manager), QNAP (Containe
 - The library page has a **Continue where you left off** button for the last book you were reading.
 
 Rebuilding or updating the container doesn't touch either folder.
+
+### Connecting Obsidian
+
+Shelf writes plain Markdown files into a `Shelf/` folder inside your vault:
+
+```
+<your vault>/Shelf/Books/Mistborn.md   one page per book (properties + "## Notes")
+<your vault>/Shelf/Notes/…             notes from the Notes tab
+<your vault>/Shelf/Quotes.md           your saved quotes (rewritten by Shelf whenever you save or remove one)
+```
+
+1. In `docker-compose.yml`, mount your vault folder (the one that contains `.obsidian`) at `/vault`, for example `/volume1/Obsidian/My Vault:/vault`.
+2. Set `OBSIDIAN_VAULT_NAME` to the vault's name exactly as Obsidian shows it. That turns on the **Open in Obsidian** buttons, which open the note in the Obsidian app on the device you're using.
+3. Get the vault onto your other devices however you already do. Obsidian Sync, Syncthing, or opening the NAS share from Obsidian on your PC all work, since Shelf only reads and writes the files.
+
+If you don't mount a vault, notes go to `data/vault/Shelf`. You can open `data/vault` as a vault in Obsidian at any time.
+
+How it stays in sync:
+- Each note Shelf writes has a hidden Obsidian comment (`%% shelf id=… %%`) so Shelf can edit or delete it later.
+- Notes you type yourself under `## Notes` in Obsidian show up in Shelf too.
+- You can rename or move a book's page in Obsidian. Shelf finds it again by its `shelf-id` property.
+- If a note was changed in Obsidian while it was also open in Shelf's editor, Shelf won't overwrite it. It asks whether to load the newer version or keep yours.
 
 ### Organising files
 

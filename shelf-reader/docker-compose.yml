@@ -10,6 +10,11 @@ services:
       # Set a password so only you can open the reader. Username defaults to "reader".
       - READER_PASSWORD=change-me
       # - READER_USER=reader
+      # Obsidian: notes are written as Markdown into <vault>/Shelf. Mount your vault below,
+      # then set the vault's name exactly as Obsidian shows it to get "Open in Obsidian" buttons.
+      - OBSIDIAN_VAULT=/vault
+      # - OBSIDIAN_VAULT_NAME=My Vault
+      # - OBSIDIAN_FOLDER=Shelf
     # Run as your NAS user so uploaded files are owned by you (Synology is often 1026:100,
     # Unraid 99:100, most Linux boxes 1000:1000). Run `id` over SSH to check.
     # user: "1000:1000"
@@ -21,3 +26,6 @@ services:
       #   /mnt/user/books:/library       (Unraid)
       #   /mnt/tank/books:/library       (TrueNAS)
       - ./library:/library
+      # Your Obsidian vault folder on the NAS (the folder that contains .obsidian), e.g.
+      #   /volume1/Obsidian/My Vault:/vault
+      - ./vault:/vault
