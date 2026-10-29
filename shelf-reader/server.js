@@ -49,7 +49,7 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 
 // ---------- persistent state (progress + typing stats) ----------
 
-let state = { progress: {}, typing: { totals: {}, days: {}, books: {} }, keys: { letters: {}, confusions: {} }, tests: [] };
+let state = { progress: {}, typing: { totals: {}, days: {}, books: {} }, keys: { letters: {}, confusions: {} }, tests: [], quotes: [] };
 try {
   state = { ...state, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) };
 } catch { /* first run */ }
@@ -322,7 +322,25 @@ function recordKeys(body) {
   }
 }
 
-const SOURCES = new Set(['words', 'books', 'lesson']);
+const SOURCES = new Set(['words', 'books', 'lesson', 'quotes', 'anime']);
+
+// Saved quotes: from the built-in collections, typing tests, or text selected in a novel.
+const QUOTE_KINDS = new Set(['quote', 'anime', 'book']);
+function cleanQuote(body) {
+  const str = (v, max) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
+  const text = str(body.text, 2000);
+  if (!text) return null;
+  return {
+    id: crypto.randomBytes(6).toString('hex'),
+    at: Date.now(),
+    kind: QUOTE_KINDS.has(body.kind) ? body.kind : 'book',
+    text,
+    by: str(body.by, 200),
+    from: str(body.from, 300),
+    bookId: typeof body.bookId === 'string' && /^[0-9a-f]{16}$/.test(body.bookId) ? body.bookId : undefined,
+    chapter: Number.isInteger(body.chapter) && body.chapter >= 0 ? body.chapter : undefined,
+  };
+}
 
 // keybr-style practice state: how many letters are unlocked, the target speed, and a
 // smoothed speed per letter. The browser computes it; we just validate and keep it.
@@ -399,6 +417,22 @@ async function route(req, res) {
   if (p === '/api/upload' && req.method === 'POST') return handleUpload(req, res);
   if (p === '/api/typing' && req.method === 'GET') return json(res, 200, state.typing);
   if (p === '/api/tests' && req.method === 'GET') return json(res, 200, { tests: state.tests, ...state.keys, adaptive: state.adaptive || null });
+  if (p === '/api/quotes' && req.method === 'GET') return json(res, 200, state.quotes);
+  if (p === '/api/quotes' && req.method === 'POST') {
+    const quote = cleanQuote(await readJson(req));
+    if (!quote) return json(res, 400, { error: 'Nothing to save' });
+    const dupe = state.quotes.find((q) => q.text === quote.text);
+    if (dupe) return json(res, 200, dupe);
+    state.quotes.push(quote);
+    saveState();
+    return json(res, 201, quote);
+  }
+  const qm = /^\/api\/quotes\/([0-9a-f]{12})$/.exec(p);
+  if (qm && req.method === 'DELETE') {
+    state.quotes = state.quotes.filter((q) => q.id !== qm[1]);
+    saveState();
+    return json(res, 200, { ok: true });
+  }
   if (p === '/api/adaptive' && req.method === 'PUT') {
     const adaptive = cleanAdaptive(await readJson(req));
     if (!adaptive) return json(res, 400, { error: 'Invalid practice state' });

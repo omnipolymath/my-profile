@@ -12,10 +12,12 @@ For novels there's also **Typing mode**: the book is shown one paragraph at a ti
   - **Focus aid**, for when it's hard to keep your place:
     - *Highlight sentence* highlights the sentence you're on. Move it with ↓ / ↑ or the round buttons, or tap any sentence.
     - *Reading ruler* is a bar over the line you're reading that shades everything else. Drag it, step it a line at a time with ↓ / ↑, or tap a line.
+- **Quotes** tab: a random famous or anime quote to discover (save it, type it, or get another), plus **all your saved quotes**. You can filter them (quotes, anime, from my books), type them, copy them, or jump back to the book. To save a line from a novel, just **select it while reading** and tap *Save quote*. Anime lines are common English translations, so wording can differ slightly between subs and dubs.
 - **Manga reader:** single page or long-strip (webtoon) mode, right-to-left or left-to-right, fit height or fit width, page slider. Tap the left or right side to turn pages, tap the middle to hide the toolbars.
 - **Typing**, in the *Typing* tab:
   - **Practice (works like keybr.com):** you start with 6 letters and type short lessons of made-up but pronounceable words that use only the letters you've unlocked. Each lesson leans on your slowest letter. When every letter reaches your target speed (35 WPM by default, adjustable), the next letter unlocks. A mistake stops the cursor until you press the right key. The row of letters shows how close each one is to target.
   - **Speed tests:** 15 s, 30 s, 1 min or 2 min, using common words or passages **from your own novels, only from parts you've already reached, so there are no spoilers**.
+  - **Quote tests:** type a famous quote or an anime quote (Luffy, Naruto, Edward Elric, Saitama, Rengoku and more). There's no timer; you type the whole quote, then tap **♡ Save quote** if you like it.
   - **Progress:** a speed-over-time chart, personal bests, recent results, and a keyboard map of the **letters you miss most**, including which key you usually hit instead.
   - **Type the book:** press *Type* while reading and type the novel paragraph by paragraph from where you are. Your reading position moves with you. *Simple punctuation* turns curly quotes, dashes and accents into plain keys.
 - No database and no npm dependencies. It's one small Node.js process.
@@ -49,7 +51,7 @@ Works on anything that runs Docker: Synology (Container Manager), QNAP (Containe
 ### Where your books and your place are kept
 
 - **Books:** every upload is saved as a normal file in the library folder (`/library`), so it's on your NAS's own disks. You can browse, back up or copy those files like any others.
-- **Your place in each book, typing history, unlocked letters and per-letter stats:** saved to `state.json` in the data folder (`/data`). This happens a moment after you stop scrolling or turn a page, and immediately when you lock your phone, switch apps or close the tab. Reading progress, typing progress and typing stats all live in that one file, so back it up along with your books.
+- **Your place in each book, typing history, unlocked letters, per-letter stats and saved quotes:** saved to `state.json` in the data folder (`/data`). This happens a moment after you stop scrolling or turn a page, and immediately when you lock your phone, switch apps or close the tab. Reading progress, typing progress and typing stats all live in that one file, so back it up along with your books.
   - Novels remember the exact paragraph you were on, not just a percentage, so you land in the same spot on a phone and a PC, and changing font size doesn't lose your place.
   - Manga remembers the page.
   - Your place stays with a book even if you rename the file or move it to another folder on the NAS.

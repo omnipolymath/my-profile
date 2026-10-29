@@ -205,6 +205,20 @@ async function main() {
     const back = await (await get(`/api/books/${novel.id}/progress`)).json();
     assert.strictEqual(back.furthest, 1.5);
 
+    // saved quotes
+    const q1 = await (await fetch(`${base}/api/quotes`, {
+      method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'anime', text: '  Set your heart ablaze.  ', by: 'Kyojuro Rengoku', from: 'Demon Slayer' }),
+    })).json();
+    assert.strictEqual(q1.text, 'Set your heart ablaze.');
+    const again = await fetch(`${base}/api/quotes`, {
+      method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'Set your heart ablaze.' }),
+    });
+    assert.strictEqual(again.status, 200, 'saving the same quote twice keeps one copy');
+    assert.strictEqual((await (await get('/api/quotes')).json()).length, 1);
+    await fetch(`${base}/api/quotes/${q1.id}`, { method: 'DELETE', headers: auth });
+    assert.strictEqual((await (await get('/api/quotes')).json()).length, 0);
+
     // fonts are served and cached
     const font = await get('/fonts/literata-latin-wght-normal.woff2');
     assert.strictEqual(font.headers.get('content-type'), 'font/woff2');

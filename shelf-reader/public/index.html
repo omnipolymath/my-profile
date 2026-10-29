@@ -19,6 +19,7 @@
       <nav class="tabs">
         <a href="#/" class="tab active">Library</a>
         <a href="#/tests" class="tab">Typing</a>
+        <a href="#/quotes" class="tab">Quotes</a>
       </nav>
       <div class="spacer"></div>
       <button class="theme-switch"></button>
@@ -108,6 +109,7 @@
     <div id="epubPane" class="pane">
       <div class="frame-wrap">
         <iframe id="chapter" sandbox="allow-same-origin" title="Chapter"></iframe>
+        <button id="selSave" class="sel-save primary" hidden>♡ Save quote</button>
         <div id="focusNav" class="focus-nav" hidden>
           <button id="focusUp" title="Previous (↑)" aria-label="Previous">▲</button>
           <button id="focusDown" title="Next (↓)" aria-label="Next">▼</button>
@@ -170,6 +172,7 @@
       <nav class="tabs">
         <a href="#/" class="tab">Library</a>
         <a href="#/tests" class="tab active">Typing</a>
+        <a href="#/quotes" class="tab">Quotes</a>
       </nav>
       <div class="spacer"></div>
       <button class="theme-switch"></button>
@@ -206,10 +209,10 @@
             <button data-v="15">15s</button><button data-v="30">30s</button><button data-v="60">1 min</button><button data-v="120">2 min</button>
           </div>
           <div class="segmented" id="srcSeg" aria-label="Text">
-            <button data-v="words">Common words</button><button data-v="books">From my books</button>
+            <button data-v="words">Common words</button><button data-v="books">From my books</button><button data-v="quotes">Quotes</button><button data-v="anime">Anime quotes</button>
           </div>
         </div>
-        <p id="testSource" class="test-source muted"></p>
+        <div class="source-row"><p id="testSource" class="test-source muted"></p><span id="quoteHeart"></span></div>
       </div>
 
       <div id="testBox" class="test-box">
@@ -257,6 +260,42 @@
     </main>
   </section>
 
+  <!-- Quotes -->
+  <section id="quotes" class="view" hidden>
+    <header class="bar">
+      <h1 class="brand">Shelf</h1>
+      <nav class="tabs">
+        <a href="#/" class="tab">Library</a>
+        <a href="#/tests" class="tab">Typing</a>
+        <a href="#/quotes" class="tab active">Quotes</a>
+      </nav>
+      <div class="spacer"></div>
+      <button class="theme-switch"></button>
+    </header>
+    <main class="quotes-main">
+      <section class="discover">
+        <div class="segmented" id="discoverSeg">
+          <button data-v="all">Everything</button><button data-v="quote">Quotes</button><button data-v="anime">Anime</button>
+        </div>
+        <blockquote id="discoverText" class="discover-text"></blockquote>
+        <p id="discoverBy" class="discover-by muted"></p>
+        <div id="discoverActions" class="discover-actions">
+          <button id="discoverType" class="ghost">Type it</button>
+          <button id="discoverNext" class="primary">Another one</button>
+        </div>
+      </section>
+      <section>
+        <div class="saved-head">
+          <h2>Saved quotes <small id="savedCount" class="muted"></small></h2>
+          <div class="segmented" id="quoteFilter">
+            <button data-v="all">All</button><button data-v="quote">Quotes</button><button data-v="anime">Anime</button><button data-v="book">From my books</button>
+          </div>
+        </div>
+        <div id="savedList" class="saved-list"></div>
+      </section>
+    </main>
+  </section>
+
   <div id="toast" class="toast" hidden></div>
   <div id="syncBar" class="toast sync" hidden><span></span><button class="jump primary">Jump there</button><button class="dismiss ghost" title="Stay here">✕</button></div>
   <div id="tooltip" class="tooltip" hidden></div>
@@ -266,6 +305,7 @@
   <script src="js/reader.js"></script>
   <script src="js/focus.js"></script>
   <script src="js/typing.js"></script>
+  <script src="js/quotes.js"></script>
   <script src="js/tests.js"></script>
 </body>
 </html>

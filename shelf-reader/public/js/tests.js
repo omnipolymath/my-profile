@@ -201,7 +201,7 @@ async function bookPassage(minChars) {
       while (start > 0 && total < minChars) { const t = clean(paras[--start]); parts.unshift(t); total += t.length + 1; }
       const text = parts.filter(Boolean).join(' ');
       if (text.length < 40) continue;
-      return { text, label: `${detail.title} · ${chapterLabels(detail)[c].replace(/^\d+\.\s*/, '')}` };
+      return { text, label: `${detail.title} · ${chapterLabels(detail)[c].replace(/^\d+\.\s*/, '')}`, bookId: b.id, chapter: c, title: detail.title };
     }
   }
   return null;
@@ -230,8 +230,9 @@ const hideTip = () => { $('tooltip').hidden = true; };
 
 function describeTest(t) {
   const when = new Date(t.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  const len = t.source === 'lesson' ? 'lesson' : t.duration >= 60 ? `${t.duration / 60} min` : `${t.duration}s`;
-  const text = t.source === 'lesson' ? t.label || 'practice' : t.source === 'books' ? t.label || 'my books' : 'common words';
+  const isQuote = t.source === 'quotes' || t.source === 'anime';
+  const len = t.source === 'lesson' ? 'lesson' : isQuote ? `quote, ${t.duration}s` : t.duration >= 60 ? `${t.duration / 60} min` : `${t.duration}s`;
+  const text = t.source === 'lesson' ? t.label || 'practice' : t.source === 'words' ? 'common words' : t.label || t.source;
   return { when, len, text };
 }
 
@@ -356,7 +357,7 @@ function drawKeyboard(data, signal) {
 
 // ---------- the page ----------
 
-async function openTests() {
+async function openTests(params = new URLSearchParams()) {
   const token = viewToken;
   $('tests').hidden = false;
   document.title = 'Typing · Shelf';
@@ -369,7 +370,18 @@ async function openTests() {
 
   if (!wordModel) wordModel = buildWordModel(COMMON_WORDS);
   if (!['practice', 'speed'].includes(settings.typingMode)) settings.typingMode = 'practice';
-  if (!['words', 'books'].includes(settings.testSource)) settings.testSource = 'words';
+  if (!['words', 'books', 'quotes', 'anime'].includes(settings.testSource)) settings.testSource = 'words';
+  // "Type it" from the Quotes page hands over one specific quote.
+  let handedQuote = null;
+  if (params.has('quote')) {
+    try { handedQuote = JSON.parse(sessionStorage.getItem('shelf.typeQuote')); } catch { /* none */ }
+    sessionStorage.removeItem('shelf.typeQuote');
+    if (handedQuote) settings.typingMode = 'speed';
+  }
+  const quoteTest = () => settings.testSource === 'quotes' || settings.testSource === 'anime' || !!currentQuote?.handed;
+  let currentQuote = null; // what the ♡ button saves
+  const heart = heartButton(() => currentQuote, signal);
+  $('quoteHeart').replaceChildren(heart.el);
   const adaptive = data.adaptive || { unlocked: START_KEYS, target: 35, keys: {} };
   const keyStats = createKeyStats();
   const box = $('testBox');
@@ -385,7 +397,7 @@ async function openTests() {
   const typer = createTyper(box, $('testWords'), input, signal, {
     stopOnError: practicing,
     onStart() {
-      if (practicing()) return;
+      if (practicing() || quoteTest()) return;
       const end = performance.now() + settings.testDuration * 1000;
       clearInterval(timer);
       timer = setInterval(() => {
@@ -505,16 +517,34 @@ async function openTests() {
   async function newSpeedTest() {
     const mine = ++round;
     $('testResult').hidden = true;
-    $('tLeft').textContent = settings.testDuration;
+    $('tLeft').textContent = quoteTest() ? '' : settings.testDuration;
+    $('durSeg').hidden = settings.testSource === 'quotes' || settings.testSource === 'anime';
+    currentQuote = null;
     let text = '';
     let label = 'Common English words';
-    if (settings.testSource === 'books') {
+    const clean = (t) => normalizeText(t, true).replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim();
+    if (handedQuote) {
+      currentQuote = { ...handedQuote, handed: true };
+      handedQuote = null;
+      text = clean(currentQuote.text);
+      label = quoteSource(currentQuote) || 'Saved quote';
+      $('testSource').textContent = `${label} · type the whole quote, there's no timer`;
+      $('tLeft').textContent = '';
+    } else if (settings.testSource === 'quotes' || settings.testSource === 'anime') {
+      const list = settings.testSource === 'anime' ? ANIME_QUOTES : QUOTES;
+      const last = typer.label;
+      currentQuote = pick(list.filter((q) => quoteSource(q) !== last || list.length < 2));
+      text = clean(currentQuote.text);
+      label = quoteSource(currentQuote);
+      $('testSource').textContent = `${label} · type the whole quote, there's no timer`;
+    } else if (settings.testSource === 'books') {
       $('testSource').textContent = 'Finding a passage you have already read…';
       const passage = await bookPassage(settings.testDuration * 13).catch(() => null);
       if (mine !== round || signal.aborted) return;
       if (passage) {
         text = passage.text;
         label = passage.label;
+        currentQuote = { kind: 'book', text: passage.text, by: '', from: passage.label, bookId: passage.bookId, chapter: passage.chapter };
         $('testSource').innerHTML = 'From <i></i> · only from parts you have already read, so no spoilers';
         $('testSource').querySelector('i').textContent = label;
       } else {
@@ -526,18 +556,23 @@ async function openTests() {
     if (!text) text = commonWords(settings.testDuration * 3);
     typer.setText(text);
     typer.label = label;
+    heart.refresh();
   }
 
   function finishSpeedTest(r) {
-    const seconds = Math.min(r.ms / 1000, settings.testDuration) || 1;
+    const isQuote = quoteTest();
+    const source = currentQuote && currentQuote.handed ? (currentQuote.kind === 'anime' ? 'anime' : 'quotes') : settings.testSource;
+    const seconds = (isQuote ? r.ms / 1000 : Math.min(r.ms / 1000, settings.testDuration)) || 1;
     const minutes = seconds / 60;
     const wpm = (r.correct / 5) / minutes;
     const raw = (r.typedLen / 5) / minutes;
     const acc = r.keys ? (100 * (r.keys - r.errors)) / r.keys : 0;
-    const before = data.tests.filter((t) => t.source !== 'lesson' && t.duration === settings.testDuration);
+    const quoteSources = ['quotes', 'anime'];
+    const before = isQuote ? data.tests.filter((t) => quoteSources.includes(t.source))
+      : data.tests.filter((t) => (t.source === 'words' || t.source === 'books') && t.duration === settings.testDuration);
     const best = Math.max(0, ...before.map((t) => t.wpm));
     const missed = Object.entries(pendingKeys().letters).filter(([, v]) => v[1] > 0).sort((a, b) => b[1][1] - a[1][1]).slice(0, 6);
-    const test = { at: Date.now(), source: settings.testSource, label: typer.label || '', duration: settings.testDuration, wpm: Math.round(wpm * 10) / 10, raw: Math.round(raw * 10) / 10, acc: Math.round(acc * 10) / 10, chars: r.typedLen, errors: r.errors };
+    const test = { at: Date.now(), source, label: typer.label || '', duration: isQuote ? Math.round(seconds) : settings.testDuration, wpm: Math.round(wpm * 10) / 10, raw: Math.round(raw * 10) / 10, acc: Math.round(acc * 10) / 10, chars: r.typedLen, errors: r.errors };
     save(test);
     $('rWpm').textContent = Math.round(wpm);
     $('rAcc').textContent = `${acc.toFixed(1)}%`;
@@ -599,11 +634,13 @@ async function openTests() {
         + card('Accuracy, last 10 lessons', recent.length ? avg(recent, 'acc').toFixed(1) : '–', '%')
         + card('Lessons', lessons.length);
     } else {
+      const timed = speed.filter((t) => t.source === 'words' || t.source === 'books');
+      const quoteRuns = speed.filter((t) => t.source === 'quotes' || t.source === 'anime');
       $('bests').innerHTML = [15, 30, 60, 120].map((d) => {
-        const list = speed.filter((t) => t.duration === d);
+        const list = timed.filter((t) => t.duration === d);
         const label = `Best ${d >= 60 ? `${d / 60} min` : `${d}s`} test`;
         return card(label, list.length ? Math.round(Math.max(...list.map((t) => t.wpm))) : '–', list.length ? 'WPM' : '');
-      }).join('');
+      }).join('') + card('Best quote', quoteRuns.length ? Math.round(Math.max(...quoteRuns.map((t) => t.wpm))) : '–', quoteRuns.length ? 'WPM' : '');
     }
     const shown = (practicing() ? lessons : speed).slice(-60);
     $('chartTitle').textContent = practicing() ? 'Practice speed, lesson by lesson' : 'Speed test results over time';
@@ -636,6 +673,8 @@ async function openTests() {
     for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.v === mode);
     $('practicePane').hidden = mode !== 'practice';
     $('speedPane').hidden = mode !== 'speed';
+    if (mode === 'practice') currentQuote = null;
+    heart.refresh();
     $('testResult').hidden = true;
     $('tLeft').textContent = '';
     $('tLiveWpm').textContent = '';

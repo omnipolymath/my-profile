@@ -253,7 +253,8 @@ function epubReader(book, params, signal) {
     updateInfo();
     save();
 
-    frame.contentWindow.addEventListener('scroll', () => { updateInfo(); save(); });
+    frame.contentWindow.addEventListener('scroll', () => { updateInfo(); save(); selection.hide(); });
+    doc.addEventListener('selectionchange', selection.check);
     frame.contentWindow.addEventListener('resize', () => focus.refresh());
     doc.addEventListener('keydown', onKey);
     doc.addEventListener('pointerdown', () => panel.close());
@@ -282,6 +283,41 @@ function epubReader(book, params, signal) {
   }
   window.addEventListener('keydown', onKey, { signal });
 
+  // Select text in the chapter to save it as a quote.
+  const selection = (() => {
+    const btn = $('selSave');
+    let picked = '';
+    const hide = () => { btn.hidden = true; picked = ''; };
+    const check = debounce(() => {
+      const doc = frame.contentDocument;
+      const sel = doc && doc.getSelection();
+      const text = sel ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+      if (!sel || sel.isCollapsed || text.length < 3 || text.length > 2000) { hide(); return; }
+      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      picked = text;
+      const below = rect.top < 50;
+      btn.style.left = `${clamp(rect.left + rect.width / 2, 70, frame.clientWidth - 70)}px`;
+      btn.style.top = `${clamp(below ? rect.bottom + 46 : rect.top - 8, 44, frame.clientHeight - 8)}px`;
+      btn.textContent = findSaved(text) ? '♥ Saved' : '♡ Save quote';
+      btn.hidden = false;
+    }, 250);
+    btn.addEventListener('pointerdown', (e) => e.preventDefault(), { signal });
+    btn.addEventListener('click', async () => {
+      if (!picked) return;
+      try {
+        await saveQuote({
+          kind: 'book', text: picked, by: book.author || '', bookId: book.id, chapter: ch,
+          from: `${book.title} · ${labels[ch].replace(/^\d+\.\s*/, '')}`,
+        });
+        toast('Saved to your quotes ♥');
+        frame.contentDocument?.getSelection()?.removeAllRanges();
+      } catch (err) { toast(err.message); }
+      hide();
+    }, { signal });
+    loadSavedQuotes().catch(() => {});
+    return { check, hide };
+  })();
+
   const panel = setupReadPanel(signal, (kind) => {
     if (kind === 'focus') focus.refresh();
     else restyle();
@@ -309,6 +345,7 @@ function epubReader(book, params, signal) {
   load(ch, pendingScroll, '', pendingAnchor);
   return () => {
     save.flush();
+    selection.hide();
     focus.detach();
     frame.style.visibility = '';
     frame.src = 'about:blank';

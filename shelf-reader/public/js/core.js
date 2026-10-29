@@ -29,6 +29,8 @@ const settings = Object.assign({
   testSource: 'words', // words | books | weak
   testFont: 'mono',
   typingMode: 'practice', // practice (keybr-style) | speed
+  quoteFilter: 'all',
+  discover: 'all', // which collection the Quotes page shows: all | quote | anime
   rulerAt: null, // reading ruler position, as a fraction of the screen height
   mangaMode: 'single', // single | strip
   mangaDir: 'rtl', // rtl | ltr
@@ -203,7 +205,8 @@ function route() {
   const fail = (err) => { toast(err.message); location.hash = '#/'; };
   if (parts[0] === 'read' && parts[1]) openReader(parts[1], params).catch(fail);
   else if (parts[0] === 'type' && parts[1]) openTyping(parts[1], params).catch(fail);
-  else if (parts[0] === 'tests') openTests().catch(fail);
+  else if (parts[0] === 'tests') openTests(params).catch(fail);
+  else if (parts[0] === 'quotes') openQuotes().catch(fail);
   else showLibrary();
 }
 

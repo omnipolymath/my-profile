@@ -199,6 +199,34 @@ input[type="range"] { accent-color: var(--accent); }
 #tInput, #testInput { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; resize: none; border: 0; padding: 0; }
 .keys { font-size: 12px; }
 
+/* ---------- quotes ---------- */
+.quotes-main { max-width: 860px; margin: 0 auto; padding: 26px 18px 60px; }
+.discover { text-align: center; padding: 26px 22px 22px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); margin-bottom: 30px; }
+.discover-text { font: 400 24px/1.5 var(--read-font); margin: 22px auto 10px; max-width: 640px; }
+.discover-text::before { content: "“"; color: var(--accent); }
+.discover-text::after { content: "”"; color: var(--accent); }
+.discover-by { margin: 0 0 18px; font-size: 14px; }
+.discover-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.heart.on { color: var(--bad); }
+.heart span { font-size: 16px; line-height: 1; }
+.saved-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.saved-head h2 { margin: 0; }
+.saved-head small { font-weight: 400; font-size: 13px; margin-left: 6px; }
+.saved-list { display: grid; gap: 12px; }
+.quote-card { padding: 18px 20px 12px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+.quote-card blockquote { margin: 0 0 10px; font: 400 18px/1.6 var(--read-font); }
+.quote-meta { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.quote-meta span { font-weight: 550; }
+.quote-actions { display: flex; gap: 4px; margin-top: 8px; margin-left: -10px; flex-wrap: wrap; }
+.quote-actions button { min-height: 30px; padding: 3px 10px; font-size: 13px; color: var(--muted); }
+.quote-actions button:hover { color: var(--text); }
+.quote-actions .del { margin-left: auto; }
+.empty-quotes { text-align: center; padding: 30px 10px; }
+.sel-save { position: absolute; z-index: 6; transform: translate(-50%, -100%); box-shadow: var(--shadow); min-height: 32px; padding: 4px 12px; font-size: 13px; white-space: nowrap; }
+.source-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; min-height: 36px; margin: 8px 0 0; }
+.source-row .test-source { margin: 0; }
+.source-row .heart { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+
 /* ---------- typing tests ---------- */
 .mode-row { display: flex; justify-content: center; margin-bottom: 18px; }
 .segmented.big button { font-size: 14px; padding: 6px 18px; min-height: 34px; }
@@ -313,6 +341,7 @@ kbd { font-family: var(--font-mono); background: var(--raised); border-radius: 5
   .keys { display: none; }
   .tests-main { padding: 16px 12px 40px; }
   .test-words { font-size: 20px; }
+  .discover-text { font-size: 20px; }
   .lesson-stats { gap: 16px; }
   .lesson-stats b { font-size: 19px; }
   .kchip { width: 24px; height: 30px; font-size: 13px; }
