@@ -1,0 +1,23 @@
+services:
+  shelf:
+    build: .
+    image: shelf-reader:latest
+    container_name: shelf-reader
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Set a password so only you can open the reader. Username defaults to "reader".
+      - READER_PASSWORD=change-me
+      # - READER_USER=reader
+    # Run as your NAS user so uploaded files are owned by you (Synology is often 1026:100,
+    # Unraid 99:100, most Linux boxes 1000:1000). Run `id` over SSH to check.
+    # user: "1000:1000"
+    volumes:
+      # Reading progress + typing stats live here.
+      - ./data:/data
+      # Your books. Point this at an existing NAS share if you have one, e.g.
+      #   /volume1/books:/library        (Synology)
+      #   /mnt/user/books:/library       (Unraid)
+      #   /mnt/tank/books:/library       (TrueNAS)
+      - ./library:/library

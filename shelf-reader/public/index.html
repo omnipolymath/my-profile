@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#16161a">
+  <title>Shelf</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='5' width='7' height='22' rx='1.5' fill='%23e8a54b'/%3E%3Crect x='13' y='8' width='6' height='19' rx='1.5' fill='%236aa9e9'/%3E%3Crect x='21' y='6' width='7' height='21' rx='1.5' transform='rotate(8 24 16)' fill='%23d46a6a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+
+  <!-- Library -->
+  <section id="library" class="view" hidden>
+    <header class="bar">
+      <h1 class="brand">Shelf</h1>
+      <input id="search" type="search" placeholder="Search title, author, folder…" autocomplete="off">
+      <select id="filter" aria-label="Filter">
+        <option value="all">All</option>
+        <option value="epub">Novels</option>
+        <option value="comic">Manga</option>
+      </select>
+      <select id="sort" aria-label="Sort">
+        <option value="recent">Recently read</option>
+        <option value="added">Recently added</option>
+        <option value="title">Title</option>
+      </select>
+      <button id="uploadBtn" class="primary">Upload</button>
+      <button id="themeBtn" class="ghost" title="Change theme">🌓</button>
+      <input id="fileInput" type="file" multiple accept=".epub,.cbz,.zip" hidden>
+    </header>
+    <div id="typingSummary" class="typing-summary" hidden></div>
+    <div id="uploads" class="uploads"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" hidden>
+      <p><strong>Your shelf is empty.</strong></p>
+      <p>Drag &amp; drop <code>.epub</code> novels or <code>.cbz</code> / <code>.zip</code> manga here, or press Upload.</p>
+      <p class="muted">You can also copy files straight into the library folder on your NAS; they show up automatically.</p>
+    </div>
+    <div id="dropzone" class="dropzone" hidden><div>Drop to upload</div></div>
+  </section>
+
+  <!-- Reader (EPUB + manga) -->
+  <section id="reader" class="view" hidden>
+    <header class="bar reader-bar">
+      <a class="ghost btn" href="#/" title="Library">←</a>
+      <div class="reader-title"><span id="rTitle"></span><small id="rSub"></small></div>
+      <div id="epubTools" class="tools">
+        <select id="tocSelect" aria-label="Chapter"></select>
+        <button id="fontDown" class="ghost" title="Smaller text">A−</button>
+        <button id="fontUp" class="ghost" title="Larger text">A+</button>
+        <button id="rTheme" class="ghost" title="Theme">🌓</button>
+        <button id="typeHere" class="primary" title="Practise typing from this chapter">⌨ Type</button>
+      </div>
+      <div id="comicTools" class="tools">
+        <button id="modeBtn" class="ghost" title="Single page / long strip"></button>
+        <button id="dirBtn" class="ghost" title="Reading direction"></button>
+        <button id="fitBtn" class="ghost" title="Fit"></button>
+      </div>
+    </header>
+    <div id="epubPane" class="pane">
+      <iframe id="chapter" sandbox="allow-same-origin" title="Chapter"></iframe>
+      <footer class="chapter-nav">
+        <button id="prevCh" class="ghost">‹ Prev</button>
+        <span id="chInfo" class="muted"></span>
+        <button id="nextCh" class="ghost">Next ›</button>
+      </footer>
+    </div>
+    <div id="comicPane" class="pane comic">
+      <div id="pageView" class="page-view"><img id="pageImg" alt=""></div>
+      <div id="stripView" class="strip-view"></div>
+      <footer class="comic-nav">
+        <input id="pageSlider" type="range" min="0" value="0" aria-label="Page">
+        <span id="pageInfo" class="muted"></span>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Typing practice -->
+  <section id="typing" class="view" hidden>
+    <header class="bar reader-bar">
+      <a class="ghost btn" href="#/" title="Library">←</a>
+      <div class="reader-title"><span id="tTitle"></span><small id="tSub"></small></div>
+      <div class="tools">
+        <select id="tChapter" aria-label="Chapter"></select>
+        <label class="check" title="Turn curly quotes, dashes, ellipses and accents into plain keyboard characters">
+          <input id="tSimplify" type="checkbox"> Simple punctuation
+        </label>
+        <button id="tRead" class="ghost">📖 Read</button>
+      </div>
+    </header>
+    <div class="stats">
+      <div><b id="sWpm">0</b><span>WPM</span></div>
+      <div><b id="sAcc">100%</b><span>accuracy</span></div>
+      <div><b id="sTime">0:00</b><span>typing time</span></div>
+      <div><b id="sPara">–</b><span>paragraph</span></div>
+    </div>
+    <div id="typeArea" class="type-area">
+      <p id="tPrev" class="t-prev"></p>
+      <p id="tCurrent" class="t-current"></p>
+      <p id="tNext" class="t-next"></p>
+      <div id="tPaused" class="t-paused">Click here or press any key to type</div>
+      <textarea id="tInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Typing input"></textarea>
+    </div>
+    <footer class="type-nav">
+      <button id="tBack" class="ghost">‹ Previous paragraph</button>
+      <span class="muted keys">Esc pause · Ctrl+→ skip</span>
+      <button id="tSkip" class="ghost">Skip paragraph ›</button>
+    </footer>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
